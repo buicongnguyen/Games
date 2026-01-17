@@ -36,6 +36,10 @@ h1 {
     background-color: #0f0f1f;
     display: block;
     box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
 }
 
 .side-panel {
