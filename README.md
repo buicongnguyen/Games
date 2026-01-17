@@ -3,27 +3,31 @@ Contains games.
 
 # Tetris Game
 
-A classic Tetris game implemented using HTML5 Canvas and vanilla JavaScript.
+A classic Tetris game implemented using HTML5 Canvas and vanilla JavaScript with enhanced visuals and gameplay.
 
 ## How to Play
 
-1. Open `index.html` in your web browser to start the game.
-2. Use the keyboard controls to manipulate the falling tetrominoes:
+1. Open `index.html` in your web browser to load the game.
+2. Click the **"Start Game"** button to begin playing.
+3. Use the keyboard controls to manipulate the falling tetrominoes:
    - **Left Arrow Key**: Move piece left
    - **Right Arrow Key**: Move piece right
    - **Down Arrow Key**: Soft drop (move piece down faster)
    - **Up Arrow Key**: Rotate piece clockwise
    - **Space Bar**: Hard drop (instantly drop the piece to the bottom)
    - **P Key**: Pause/Resume the game
+4. Click the **"Pause Game"** / **"Start Game"** button to pause/resume gameplay.
 
 ## Game Features
 
-- Classic Tetris gameplay with all 7 tetromino shapes
+- Classic Tetris gameplay with all 7 tetromino shapes in vibrant colors
 - Score tracking based on lines cleared
 - Level progression that increases game speed
 - Next piece preview
 - Line clearing mechanics (1, 2, 3, or 4 lines at once)
-- Game over detection
+- Game over detection with restart option
+- Modern, sleek UI with gradient backgrounds and glass-morphism effects
+- Responsive design that works on different screen sizes
 
 ## Scoring System
 

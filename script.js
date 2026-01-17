@@ -36,6 +36,7 @@ let paused = false;
 let dropCounter = 0;
 let dropInterval = 1000;
 let lastTime = 0;
+let nextPiece = null;
 let player = {
     pos: {x: 0, y: 0},
     matrix: null,
@@ -49,30 +50,45 @@ function init() {
     nextCanvas = document.getElementById('next-piece');
     nextCtx = nextCanvas.getContext('2d');
 
-    // Scale canvases
-    ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
-    nextCtx.scale(BLOCK_SIZE, BLOCK_SIZE);
+    // Don't scale the context initially - we'll handle sizing in draw functions
+    // ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
+    // nextCtx.scale(BLOCK_SIZE, BLOCK_SIZE);
 
     // Initialize the board
     createBoard();
-    
+
     // Create the first piece
     resetGame();
-    
+
+    // Initially pause the game until start button is clicked
+    paused = true;
+
+    // Add event listener for start button
+    document.getElementById('start-button').addEventListener('click', () => {
+        if (gameOver) {
+            // Reset the game if it's over
+            resetGame();
+            gameOver = false;
+        }
+        paused = !paused;
+        document.getElementById('start-button').textContent = paused ? 'Start Game' : 'Pause Game';
+    });
+
     // Start the game loop
     requestAnimationFrame(update);
-    
+
     // Event listeners for controls
     document.addEventListener('keydown', event => {
         if (gameOver) return;
-        
+
         if (event.keyCode === 80) { // P key to pause
             paused = !paused;
+            document.getElementById('start-button').textContent = paused ? 'Start Game' : 'Pause Game';
             return;
         }
-        
+
         if (paused) return;
-        
+
         if (event.keyCode === 37) { // Left arrow
             playerMove(-1);
         } else if (event.keyCode === 39) { // Right arrow
@@ -113,40 +129,55 @@ function resetGame() {
 // Reset the player's position and get a new piece
 function playerReset() {
     const pieces = 'ILJOTSZ';
-    player.matrix = createPiece(pieces[pieces.length * Math.random() | 0]);
+
+    // If nextPiece is null, generate one
+    if (!nextPiece) {
+        nextPiece = createPiece(pieces[pieces.length * Math.random() | 0]);
+    }
+
+    // Assign the next piece to the player
+    player.matrix = nextPiece;
+
+    // Generate a new next piece
+    nextPiece = createPiece(pieces[pieces.length * Math.random() | 0]);
+
     player.pos.y = 0;
     player.pos.x = (COLS / 2 | 0) - (player.matrix[0].length / 2 | 0);
-    
+
     // Game over condition
     if (collide()) {
         gameOver = true;
     }
-    
+
     // Draw next piece preview
     drawNextPiece();
 }
 
 // Draw the next piece preview
 function drawNextPiece() {
+    // Clear the next piece canvas
     nextCtx.fillStyle = '#111';
     nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
-    
-    // Create a temporary piece to draw
-    const pieces = 'ILJOTSZ';
-    const nextPiece = createPiece(pieces[pieces.length * Math.random() | 0]);
-    
-    nextCtx.fillStyle = COLORS[nextPiece.type];
-    nextCtx.strokeStyle = '#000';
-    nextCtx.lineWidth = 0.05;
-    
-    nextPiece.forEach((row, y) => {
-        row.forEach((value, x) => {
-            if (value !== 0) {
-                nextCtx.fillRect(x, y, 1, 1);
-                nextCtx.strokeRect(x, y, 1, 1);
-            }
+
+    if (nextPiece) {
+        const [piece, type] = nextPiece;
+        nextCtx.fillStyle = COLORS[type]; // Use the color of the piece
+        nextCtx.strokeStyle = '#000';
+        nextCtx.lineWidth = 0.05;
+
+        piece.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value !== 0) {
+                    // Calculate position to center the piece in the preview canvas
+                    const offsetX = (nextCanvas.width/BLOCK_SIZE - piece[0].length) / 2;
+                    const offsetY = (nextCanvas.height/BLOCK_SIZE - piece.length) / 2;
+
+                    nextCtx.fillRect((x + offsetX) * BLOCK_SIZE, (y + offsetY) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    nextCtx.strokeRect((x + offsetX) * BLOCK_SIZE, (y + offsetY) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                }
+            });
         });
-    });
+    }
 }
 
 // Create a piece based on the type
@@ -165,10 +196,10 @@ function draw() {
     // Clear the canvas
     ctx.fillStyle = '#111';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw the board
+
+    // Draw the board grid
     drawMatrix(board, {x: 0, y: 0});
-    
+
     // Draw the current piece
     drawMatrix(player.matrix[0], player.pos, player.matrix[1]);
 }
@@ -181,9 +212,10 @@ function drawMatrix(matrix, offset, type = null) {
                 ctx.fillStyle = COLORS[type || value];
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 0.05;
-                
-                ctx.fillRect(x + offset.x, y + offset.y, 1, 1);
-                ctx.strokeRect(x + offset.x, y + offset.y, 1, 1);
+
+                // Scale the drawing to match the block size
+                ctx.fillRect((x + offset.x) * BLOCK_SIZE, (y + offset.y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                ctx.strokeRect((x + offset.x) * BLOCK_SIZE, (y + offset.y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
             }
         });
     });
@@ -194,10 +226,18 @@ function collide() {
     const [matrix, type] = player.matrix;
     for (let y = 0; y < matrix.length; y++) {
         for (let x = 0; x < matrix[y].length; x++) {
-            if (matrix[y][x] !== 0 &&
-               (board[y + player.pos.y] &&
-                board[y + player.pos.y][x + player.pos.x]) !== 0) {
-                return true;
+            if (matrix[y][x] !== 0) {
+                // Check if out of bounds or collides with placed pieces
+                if (
+                    typeof board[y + player.pos.y] === 'undefined' ||
+                    typeof board[y + player.pos.y][x + player.pos.x] === 'undefined' ||
+                    x + player.pos.x < 0 ||
+                    x + player.pos.x >= COLS ||
+                    y + player.pos.y >= ROWS ||
+                    board[y + player.pos.y][x + player.pos.x] !== 0
+                ) {
+                    return true;
+                }
             }
         }
     }
@@ -283,22 +323,19 @@ function playerHardDrop() {
 // Sweep completed lines
 function sweep() {
     let lineCount = 0;
-    outer: for (let y = ROWS - 1; y >= 0; y--) {
-        for (let x = 0; x < COLS; x++) {
-            if (board[y][x] === 0) {
-                continue outer;
-            }
+    for (let y = ROWS - 1; y >= 0; y--) {
+        // Check if the entire row is filled
+        if (board[y].every(value => value !== 0)) {
+            // Remove the completed line
+            const row = board.splice(y, 1)[0];
+            // Add a new empty row at the top
+            board.unshift(Array(COLS).fill(0));
+            lineCount++;
+            // Since we removed a row, we need to check the same index again
+            y++; // Increment y to recheck the same position after shifting
         }
-        
-        // Remove the line
-        const row = board.splice(y, 1)[0].fill(0);
-        board.unshift(row);
-        lineCount++;
-        
-        // Since we removed a row, we need to check the same index again
-        y++;
     }
-    
+
     if (lineCount > 0) {
         // Update score based on number of lines cleared
         if (lineCount === 1) {
@@ -310,11 +347,12 @@ function sweep() {
         } else if (lineCount === 4) {
             score += 1200 * level;
         }
-        
+
         lines += lineCount;
         level = Math.floor(lines / 10) + 1;
-        dropInterval = 1000 - (level - 1) * 50; // Increase speed with level
-        
+        // Ensure drop interval doesn't become too fast or negative
+        dropInterval = Math.max(100, 1000 - (level - 1) * 50);
+
         updateScore();
     }
 }
@@ -344,14 +382,21 @@ function update(time = 0) {
         requestAnimationFrame(update);
     } else {
         // Display game over message
+        // Draw semi-transparent overlay
         ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.font = '0.8px Arial';
-        ctx.fillStyle = '#FFF';
+
+        // Draw game over text
+        ctx.font = '30px Arial';
+        ctx.fillStyle = '#FF4136';
         ctx.textAlign = 'center';
-        ctx.fillText('GAME OVER', COLS / 2, ROWS / 2);
-        ctx.fillText(`Score: ${score}`, COLS / 2, ROWS / 2 + 1);
+        ctx.textBaseline = 'middle';
+        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+
+        ctx.font = '20px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+        ctx.fillText('Press Start to play again', canvas.width / 2, canvas.height / 2 + 60);
     }
 }
 

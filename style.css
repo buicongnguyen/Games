@@ -1,73 +1,132 @@
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     margin: 0;
     padding: 20px;
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    color: #fff;
 }
 
 .game-container {
     display: flex;
     gap: 20px;
-    background-color: white;
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    background: rgba(25, 25, 35, 0.8);
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 h1 {
     grid-column: 1 / -1;
     text-align: center;
-    color: #333;
+    color: #fff;
     margin-top: 0;
+    font-size: 2.5rem;
+    text-shadow: 0 0 10px #00eeff, 0 0 20px #008cff;
+    letter-spacing: 3px;
 }
 
 #tetris {
-    border: 2px solid #333;
-    background-color: #111;
+    border: 3px solid #4a4a8a;
+    background-color: #0f0f1f;
     display: block;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
 }
 
 .side-panel {
     display: flex;
     flex-direction: column;
     gap: 20px;
+    min-width: 180px;
 }
 
 .next-piece-container {
     text-align: center;
+    background: rgba(30, 30, 50, 0.6);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid rgba(100, 100, 200, 0.3);
 }
 
 #next-piece {
-    border: 1px solid #ccc;
-    background-color: #111;
+    border: 2px solid #4a4a8a;
+    background-color: #0f0f1f;
     display: block;
-    margin: 0 auto;
+    margin: 10px auto 0;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
 }
 
 .score-container {
     text-align: center;
+    background: rgba(30, 30, 50, 0.6);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid rgba(100, 100, 200, 0.3);
+}
+
+.score-container h3 {
+    margin: 10px 0;
 }
 
 .controls {
     text-align: left;
+    background: rgba(30, 30, 50, 0.6);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid rgba(100, 100, 200, 0.3);
 }
 
 .controls p {
-    margin: 5px 0;
+    margin: 8px 0;
+    font-size: 0.9rem;
 }
 
 h3 {
-    color: #333;
+    color: #fff;
     margin-bottom: 10px;
+    font-weight: 500;
+}
+
+button {
+    background: linear-gradient(to bottom, #4a4a8a, #2a2a5a);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    font-size: 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    width: 100%;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+button:hover {
+    background: linear-gradient(to bottom, #5a5a9a, #3a3a6a);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+button:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 @media (max-width: 768px) {
     .game-container {
         flex-direction: column;
         align-items: center;
+        padding: 15px;
+    }
+
+    h1 {
+        font-size: 2rem;
     }
 }
