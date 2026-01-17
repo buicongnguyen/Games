@@ -86,6 +86,20 @@ h1 {
     font-size: 0.9rem;
 }
 
+.best-scores-container {
+    text-align: center;
+    background: rgba(30, 30, 50, 0.6);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid rgba(100, 100, 200, 0.3);
+}
+
+.best-scores-container p {
+    margin: 5px 0;
+    font-size: 0.9rem;
+    color: #FFE138; /* Highlight best scores in yellow */
+}
+
 h3 {
     color: #fff;
     margin-bottom: 10px;

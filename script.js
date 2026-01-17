@@ -47,6 +47,9 @@ let player = {
 let blockSizeX, blockSizeY;
 let gridCache = null;
 
+// Best scores
+let bestScores = [];
+
 // Initialize the game
 function init() {
     canvas = document.getElementById('tetris');
@@ -77,13 +80,20 @@ function init() {
             // Reset the game if it's over
             resetGame();
             gameOver = false;
+            paused = false; // Start the game immediately after reset
+            document.getElementById('start-button').textContent = 'Pause Game';
+        } else {
+            // Toggle pause state when game is not over
+            paused = !paused;
+            document.getElementById('start-button').textContent = paused ? 'Start Game' : 'Pause Game';
         }
-        paused = !paused;
-        document.getElementById('start-button').textContent = paused ? 'Start Game' : 'Pause Game';
     });
 
     // Pre-draw the grid to a cached image
     createGridCache();
+
+    // Initialize best scores
+    initBestScores();
 
     // Start the game loop
     requestAnimationFrame(update);
@@ -515,6 +525,51 @@ function sweep() {
     }
 }
 
+// Initialize best scores from localStorage
+function initBestScores() {
+    const savedScores = localStorage.getItem('tetrisBestScores');
+    if (savedScores) {
+        bestScores = JSON.parse(savedScores);
+    } else {
+        bestScores = [];
+    }
+    updateBestScoresDisplay();
+}
+
+// Update best scores and save to localStorage
+function updateBestScores() {
+    // Add current score to the list
+    bestScores.push(score);
+
+    // Sort scores in descending order and keep only top 3
+    bestScores.sort((a, b) => b - a);
+    bestScores = bestScores.slice(0, 3);
+
+    // Save to localStorage
+    localStorage.setItem('tetrisBestScores', JSON.stringify(bestScores));
+
+    updateBestScoresDisplay();
+}
+
+// Update the best scores display
+function updateBestScoresDisplay() {
+    const bestScoresContainer = document.querySelector('.best-scores-container');
+    if (bestScoresContainer) {
+        bestScoresContainer.innerHTML = '<h3>Best Scores:</h3>';
+        if (bestScores.length > 0) {
+            bestScores.forEach((bestScore, index) => {
+                const scoreElement = document.createElement('p');
+                scoreElement.textContent = `${index + 1}. ${bestScore}`;
+                bestScoresContainer.appendChild(scoreElement);
+            });
+        } else {
+            const noScores = document.createElement('p');
+            noScores.textContent = 'No scores yet';
+            bestScoresContainer.appendChild(noScores);
+        }
+    }
+}
+
 // Update the score display
 function updateScore() {
     document.getElementById('score').textContent = score;
@@ -541,6 +596,9 @@ function update(currentTime = 0) {
     if (!gameOver) {
         requestAnimationFrame(update);
     } else {
+        // Update best scores when game is over
+        updateBestScores();
+
         // Display game over message
         // Draw semi-transparent overlay
         ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
