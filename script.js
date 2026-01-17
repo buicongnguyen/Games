@@ -188,7 +188,14 @@ function initTouchControls() {
         }
     });
 
-    // Rotate button
+    // Up button (rotate)
+    document.getElementById('btn-up').addEventListener('click', () => {
+        if (!paused && !gameOver) {
+            playerRotate(1);
+        }
+    });
+
+    // Rotate button (alternative)
     document.getElementById('btn-rotate').addEventListener('click', () => {
         if (!paused && !gameOver) {
             playerRotate(1);
