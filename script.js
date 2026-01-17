@@ -178,9 +178,12 @@ function resetGame() {
     gameOver = false;
     paused = false;
     dropInterval = 1000;
-    
+
+    // Clear the board
+    createBoard();
+
     updateScore();
-    
+
     // Create a new piece
     playerReset();
 }
