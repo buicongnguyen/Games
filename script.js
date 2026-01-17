@@ -79,11 +79,23 @@ function init() {
 
     // Event listeners for controls
     document.addEventListener('keydown', event => {
+        // Prevent default behavior when canvas/game has focus to avoid scrolling
+        if ([32, 37, 38, 39, 40].includes(event.keyCode)) {
+            event.preventDefault();
+        }
+
         if (gameOver) return;
 
         if (event.keyCode === 80) { // P key to pause
             paused = !paused;
             document.getElementById('start-button').textContent = paused ? 'Start Game' : 'Pause Game';
+            return;
+        }
+
+        if (event.keyCode === 32) { // Space bar - hard drop
+            if (!paused) { // Only allow hard drop when game is not paused
+                playerHardDrop();
+            }
             return;
         }
 
@@ -97,10 +109,11 @@ function init() {
             playerDrop();
         } else if (event.keyCode === 38) { // Up arrow
             playerRotate(1);
-        } else if (event.keyCode === 32) { // Space bar
-            playerHardDrop();
         }
     });
+
+    // Focus the canvas element to ensure keyboard events go to the game
+    canvas.focus();
 }
 
 // Create the game board
