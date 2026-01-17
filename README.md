@@ -1,3 +1,6 @@
+# Games
+Contains games.
+
 # Tetris Game
 
 A classic Tetris game implemented using HTML5 Canvas and vanilla JavaScript.
