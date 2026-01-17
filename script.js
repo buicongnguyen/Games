@@ -194,15 +194,48 @@ function drawNextPiece() {
         const offsetX = (nextCanvas.width - piece[0].length * blockSize) / 2;
         const offsetY = (nextCanvas.height - piece.length * blockSize) / 2;
 
-        nextCtx.fillStyle = COLORS[type]; // Use the color of the piece
-        nextCtx.strokeStyle = '#000';
-        nextCtx.lineWidth = 0.5;
-
         piece.forEach((row, y) => {
             row.forEach((value, x) => {
                 if (value !== 0) {
-                    nextCtx.fillRect(offsetX + x * blockSize, offsetY + y * blockSize, blockSize, blockSize);
-                    nextCtx.strokeRect(offsetX + x * blockSize, offsetY + y * blockSize, blockSize, blockSize);
+                    const posX = offsetX + x * blockSize;
+                    const posY = offsetY + y * blockSize;
+
+                    // Create a gradient for 3D effect
+                    const gradient = nextCtx.createLinearGradient(
+                        posX, posY,
+                        posX, posY + blockSize
+                    );
+
+                    // Get the base color and create variations for 3D effect
+                    const baseColor = COLORS[type];
+
+                    // Parse the hex color to RGB
+                    let r = parseInt(baseColor.substring(1, 3), 16);
+                    let g = parseInt(baseColor.substring(3, 5), 16);
+                    let b = parseInt(baseColor.substring(5, 7), 16);
+
+                    // Calculate lighter and darker shades
+                    const lightColor = `rgb(${Math.min(255, r + 60)}, ${Math.min(255, g + 60)}, ${Math.min(255, b + 60)})`;
+                    const darkColor = `rgb(${Math.max(0, r - 40)}, ${Math.max(0, g - 40)}, ${Math.max(0, b - 40)})`;
+
+                    // Add gradient stops for 3D effect
+                    gradient.addColorStop(0, lightColor);      // Top/left - lighter
+                    gradient.addColorStop(0.5, baseColor);    // Middle - base color
+                    gradient.addColorStop(1, darkColor);      // Bottom/right - darker
+
+                    nextCtx.fillStyle = gradient;
+
+                    // Draw the main block
+                    nextCtx.fillRect(posX, posY, blockSize, blockSize);
+
+                    // Add a subtle highlight for 3D effect
+                    nextCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                    nextCtx.fillRect(posX, posY, blockSize * 0.4, blockSize * 0.4);
+
+                    // Draw a thin border
+                    nextCtx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                    nextCtx.lineWidth = 1;
+                    nextCtx.strokeRect(posX, posY, blockSize, blockSize);
                 }
             });
         });
@@ -281,15 +314,45 @@ function drawMatrix(matrix, offset, type = null) {
     matrix.forEach((row, y) => {
         row.forEach((value, x) => {
             if (value !== 0) {
-                ctx.fillStyle = COLORS[type || value];
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 0.5;
-
                 // Calculate the position using the pre-calculated block size
                 const posX = (x + offset.x) * blockSizeX;
                 const posY = (y + offset.y) * blockSizeY;
 
+                // Create a gradient for 3D effect
+                const gradient = ctx.createLinearGradient(
+                    posX, posY,
+                    posX, posY + blockSizeY
+                );
+
+                // Get the base color and create variations for 3D effect
+                const baseColor = COLORS[type || value];
+
+                // Parse the hex color to RGB
+                let r = parseInt(baseColor.substring(1, 3), 16);
+                let g = parseInt(baseColor.substring(3, 5), 16);
+                let b = parseInt(baseColor.substring(5, 7), 16);
+
+                // Calculate lighter and darker shades
+                const lightColor = `rgb(${Math.min(255, r + 60)}, ${Math.min(255, g + 60)}, ${Math.min(255, b + 60)})`;
+                const darkColor = `rgb(${Math.max(0, r - 40)}, ${Math.max(0, g - 40)}, ${Math.max(0, b - 40)})`;
+
+                // Add gradient stops for 3D effect
+                gradient.addColorStop(0, lightColor);      // Top/left - lighter
+                gradient.addColorStop(0.5, baseColor);    // Middle - base color
+                gradient.addColorStop(1, darkColor);      // Bottom/right - darker
+
+                ctx.fillStyle = gradient;
+
+                // Draw the main block
                 ctx.fillRect(posX, posY, blockSizeX, blockSizeY);
+
+                // Add a subtle highlight for 3D effect
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fillRect(posX, posY, blockSizeX * 0.4, blockSizeY * 0.4);
+
+                // Draw a thin border
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.lineWidth = 1;
                 ctx.strokeRect(posX, posY, blockSizeX, blockSizeY);
             }
         });
