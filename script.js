@@ -181,6 +181,8 @@ function playerReset() {
     // Game over condition
     if (collide()) {
         gameOver = true;
+        // Update best scores when game actually ends
+        updateBestScores();
     }
 
     // Draw next piece preview
@@ -538,15 +540,19 @@ function initBestScores() {
 
 // Update best scores and save to localStorage
 function updateBestScores() {
-    // Add current score to the list
-    bestScores.push(score);
+    // Only add the score if it's high enough to be in the top 3
+    // or if we don't have 3 scores yet
+    if (bestScores.length < 3 || score > bestScores[bestScores.length - 1]) {
+        // Add current score to the list
+        bestScores.push(score);
 
-    // Sort scores in descending order and keep only top 3
-    bestScores.sort((a, b) => b - a);
-    bestScores = bestScores.slice(0, 3);
+        // Sort scores in descending order and keep only top 3
+        bestScores.sort((a, b) => b - a);
+        bestScores = bestScores.slice(0, 3);
 
-    // Save to localStorage
-    localStorage.setItem('tetrisBestScores', JSON.stringify(bestScores));
+        // Save to localStorage
+        localStorage.setItem('tetrisBestScores', JSON.stringify(bestScores));
+    }
 
     updateBestScoresDisplay();
 }
@@ -555,7 +561,17 @@ function updateBestScores() {
 function updateBestScoresDisplay() {
     const bestScoresContainer = document.querySelector('.best-scores-container');
     if (bestScoresContainer) {
-        bestScoresContainer.innerHTML = '<h3>Best Scores:</h3>';
+        // Clear existing content except the heading
+        const heading = bestScoresContainer.querySelector('h3');
+        bestScoresContainer.innerHTML = '';
+        if (heading) {
+            bestScoresContainer.appendChild(heading.cloneNode(true));
+        } else {
+            const newHeading = document.createElement('h3');
+            newHeading.textContent = 'Best Scores:';
+            bestScoresContainer.appendChild(newHeading);
+        }
+
         if (bestScores.length > 0) {
             bestScores.forEach((bestScore, index) => {
                 const scoreElement = document.createElement('p');
@@ -596,9 +612,6 @@ function update(currentTime = 0) {
     if (!gameOver) {
         requestAnimationFrame(update);
     } else {
-        // Update best scores when game is over
-        updateBestScores();
-
         // Display game over message
         // Draw semi-transparent overlay
         ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
