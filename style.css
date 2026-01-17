@@ -171,6 +171,24 @@ button:active {
     border: 1px solid rgba(100, 100, 200, 0.3);
     width: 90%;
     max-width: 400px;
+    cursor: move;
+    /* Allow dragging anywhere - remove transform when dragged */
+}
+
+.drag-handle {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    cursor: move;
+    color: #aaa;
+    font-size: 16px;
+    user-select: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.drag-handle:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .control-row {

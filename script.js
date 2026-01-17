@@ -163,6 +163,9 @@ function init() {
 
     // Initialize touch controls
     initTouchControls();
+
+    // Make touch controls draggable
+    makeDraggable();
 }
 
 // Initialize touch controls for mobile devices
@@ -201,6 +204,86 @@ function initTouchControls() {
             playerHardDrop();
         }
     });
+}
+
+// Make the touch controls draggable
+function makeDraggable() {
+    const dragElement = document.getElementById('draggable-controls');
+    const dragHandle = dragElement.querySelector('.drag-handle');
+
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+
+    dragHandle.onmousedown = dragMouseDown;
+
+    function dragMouseDown(e) {
+        e = e || window.event;
+        e.preventDefault();
+        // Get the mouse cursor position at startup
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        // Remove transform to allow absolute positioning
+        dragElement.style.transform = 'none';
+        document.onmouseup = closeDragElement;
+        // Call a function whenever the cursor moves
+        document.onmousemove = elementDrag;
+    }
+
+    function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        // Calculate the new cursor position
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        // Set the element's new position
+        const top = dragElement.offsetTop - pos2;
+        const left = dragElement.offsetLeft - pos1;
+        dragElement.style.top = top + "px";
+        dragElement.style.left = left + "px";
+    }
+
+    function closeDragElement() {
+        // Stop moving when mouse button is released
+        document.onmouseup = null;
+        document.onmousemove = null;
+    }
+
+    // Touch events for mobile
+    dragHandle.ontouchstart = dragTouchStart;
+
+    function dragTouchStart(e) {
+        e = e || window.event;
+        e.preventDefault();
+        const touch = e.touches[0];
+        pos3 = touch.clientX;
+        pos4 = touch.clientY;
+        // Remove transform to allow absolute positioning
+        dragElement.style.transform = 'none';
+        document.ontouchend = closeDragElementTouch;
+        document.ontouchmove = elementTouchDrag;
+    }
+
+    function elementTouchDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        const touch = e.touches[0];
+        pos1 = pos3 - touch.clientX;
+        pos2 = pos4 - touch.clientY;
+        pos3 = touch.clientX;
+        pos4 = touch.clientY;
+        // Set the element's new position
+        const top = dragElement.offsetTop - pos2;
+        const left = dragElement.offsetLeft - pos1;
+        dragElement.style.top = top + "px";
+        dragElement.style.left = left + "px";
+    }
+
+    function closeDragElementTouch() {
+        // Stop moving when touch is ended
+        document.ontouchend = null;
+        document.ontouchmove = null;
+    }
 }
 
 // Create the game board
