@@ -44,7 +44,7 @@ let player = {
 };
 
 // Pre-calculated values for performance
-let blockSizeX, blockSizeY;
+let blockSizeX, blockSizeY, blockSize;
 let gridCache = null;
 
 // Best scores
@@ -57,9 +57,10 @@ function init() {
     nextCanvas = document.getElementById('next-piece');
     nextCtx = nextCanvas.getContext('2d');
 
-    // Calculate block sizes once
+    // Calculate block sizes once - use minimum to ensure square blocks
     blockSizeX = canvas.width / COLS;
     blockSizeY = canvas.height / ROWS;
+    blockSize = Math.min(blockSizeX, blockSizeY);
 
     // Don't scale the context initially - we'll handle sizing in draw functions
     // ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
@@ -74,19 +75,20 @@ function init() {
     // Initially pause the game until start button is clicked
     paused = true;
 
-    // Add event listener for start button
-    document.getElementById('start-button').addEventListener('click', () => {
-        if (gameOver) {
-            // Reset the game if it's over
-            resetGame();
-            gameOver = false;
-            paused = false; // Start the game immediately after reset
-            document.getElementById('start-button').textContent = 'Pause Game';
-        } else {
-            // Toggle pause state when game is not over
-            paused = !paused;
-            document.getElementById('start-button').textContent = paused ? 'Start Game' : 'Pause Game';
-        }
+    // Add event listener for pause button
+    document.getElementById('pause-button').addEventListener('click', () => {
+        // Toggle pause state
+        paused = !paused;
+        document.getElementById('pause-button').textContent = paused ? 'Resume' : 'Pause';
+    });
+
+    // Add event listener for reset button
+    document.getElementById('reset-button').addEventListener('click', () => {
+        // Reset the game
+        resetGame();
+        gameOver = false;
+        paused = false; // Start the game immediately after reset
+        document.getElementById('pause-button').textContent = 'Pause';
     });
 
     // Pre-draw the grid to a cached image
@@ -183,8 +185,8 @@ function playerReset() {
         gameOver = true;
         // Update best scores when game actually ends
         updateBestScores();
-        // Update button text to "Start Game" when game is over
-        document.getElementById('start-button').textContent = 'Start Game';
+        // Update pause button text when game is over
+        document.getElementById('pause-button').textContent = 'Pause';
     }
 
     // Draw next piece preview
@@ -291,12 +293,12 @@ function createGridCache() {
     gridCanvas.height = canvas.height;
     const gridCtx = gridCanvas.getContext('2d');
 
-    // Draw the grid on the offscreen canvas
+    // Draw the grid on the offscreen canvas using square blocks
     // Draw vertical lines
     for (let x = 0; x <= COLS; x++) {
         gridCtx.beginPath();
-        gridCtx.moveTo(x * blockSizeX, 0);
-        gridCtx.lineTo(x * blockSizeX, canvas.height);
+        gridCtx.moveTo(x * blockSize, 0);
+        gridCtx.lineTo(x * blockSize, canvas.height);
         gridCtx.strokeStyle = '#222';
         gridCtx.lineWidth = 0.5;
         gridCtx.stroke();
@@ -305,8 +307,8 @@ function createGridCache() {
     // Draw horizontal lines
     for (let y = 0; y <= ROWS; y++) {
         gridCtx.beginPath();
-        gridCtx.moveTo(0, y * blockSizeY);
-        gridCtx.lineTo(canvas.width, y * blockSizeY);
+        gridCtx.moveTo(0, y * blockSize);
+        gridCtx.lineTo(canvas.width, y * blockSize);
         gridCtx.strokeStyle = '#222';
         gridCtx.lineWidth = 0.5;
         gridCtx.stroke();
@@ -329,13 +331,14 @@ function drawMatrix(matrix, offset, type = null) {
         row.forEach((value, x) => {
             if (value !== 0) {
                 // Calculate the position using the pre-calculated block size
-                const posX = (x + offset.x) * blockSizeX;
-                const posY = (y + offset.y) * blockSizeY;
+                // Use the square block size for both dimensions
+                const posX = (x + offset.x) * blockSize;
+                const posY = (y + offset.y) * blockSize;
 
                 // Create a gradient for 3D effect
                 const gradient = ctx.createLinearGradient(
                     posX, posY,
-                    posX, posY + blockSizeY
+                    posX, posY + blockSize
                 );
 
                 // Get the base color and create variations for 3D effect
@@ -357,17 +360,17 @@ function drawMatrix(matrix, offset, type = null) {
 
                 ctx.fillStyle = gradient;
 
-                // Draw the main block
-                ctx.fillRect(posX, posY, blockSizeX, blockSizeY);
+                // Draw the main block with square dimensions
+                ctx.fillRect(posX, posY, blockSize, blockSize);
 
                 // Add a subtle highlight for 3D effect
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.fillRect(posX, posY, blockSizeX * 0.4, blockSizeY * 0.4);
+                ctx.fillRect(posX, posY, blockSize * 0.4, blockSize * 0.4);
 
                 // Draw a thin border
                 ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
                 ctx.lineWidth = 1;
-                ctx.strokeRect(posX, posY, blockSizeX, blockSizeY);
+                ctx.strokeRect(posX, posY, blockSize, blockSize);
             }
         });
     });

@@ -100,6 +100,17 @@ h1 {
     color: #FFE138; /* Highlight best scores in yellow */
 }
 
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.button-group button {
+    margin: 0;
+    flex: 1;
+}
+
 h3 {
     color: #fff;
     margin-bottom: 10px;
