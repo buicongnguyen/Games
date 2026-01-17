@@ -43,12 +43,20 @@ let player = {
     score: 0
 };
 
+// Pre-calculated values for performance
+let blockSizeX, blockSizeY;
+let gridCache = null;
+
 // Initialize the game
 function init() {
     canvas = document.getElementById('tetris');
     ctx = canvas.getContext('2d');
     nextCanvas = document.getElementById('next-piece');
     nextCtx = nextCanvas.getContext('2d');
+
+    // Calculate block sizes once
+    blockSizeX = canvas.width / COLS;
+    blockSizeY = canvas.height / ROWS;
 
     // Don't scale the context initially - we'll handle sizing in draw functions
     // ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
@@ -73,6 +81,9 @@ function init() {
         paused = !paused;
         document.getElementById('start-button').textContent = paused ? 'Start Game' : 'Pause Game';
     });
+
+    // Pre-draw the grid to a cached image
+    createGridCache();
 
     // Start the game loop
     requestAnimationFrame(update);
@@ -225,37 +236,48 @@ function draw() {
     drawMatrix(player.matrix[0], player.pos, player.matrix[1]);
 }
 
-// Draw the grid
-function drawGrid() {
-    const blockSizeX = canvas.width / COLS;
-    const blockSizeY = canvas.height / ROWS;
+// Create a cached grid image to avoid redrawing every frame
+function createGridCache() {
+    // Create an offscreen canvas for the grid
+    const gridCanvas = document.createElement('canvas');
+    gridCanvas.width = canvas.width;
+    gridCanvas.height = canvas.height;
+    const gridCtx = gridCanvas.getContext('2d');
 
+    // Draw the grid on the offscreen canvas
     // Draw vertical lines
     for (let x = 0; x <= COLS; x++) {
-        ctx.beginPath();
-        ctx.moveTo(x * blockSizeX, 0);
-        ctx.lineTo(x * blockSizeX, canvas.height);
-        ctx.strokeStyle = '#222';
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
+        gridCtx.beginPath();
+        gridCtx.moveTo(x * blockSizeX, 0);
+        gridCtx.lineTo(x * blockSizeX, canvas.height);
+        gridCtx.strokeStyle = '#222';
+        gridCtx.lineWidth = 0.5;
+        gridCtx.stroke();
     }
 
     // Draw horizontal lines
     for (let y = 0; y <= ROWS; y++) {
-        ctx.beginPath();
-        ctx.moveTo(0, y * blockSizeY);
-        ctx.lineTo(canvas.width, y * blockSizeY);
-        ctx.strokeStyle = '#222';
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
+        gridCtx.beginPath();
+        gridCtx.moveTo(0, y * blockSizeY);
+        gridCtx.lineTo(canvas.width, y * blockSizeY);
+        gridCtx.strokeStyle = '#222';
+        gridCtx.lineWidth = 0.5;
+        gridCtx.stroke();
+    }
+
+    // Store the cached grid
+    gridCache = gridCanvas;
+}
+
+// Draw the grid (now just draws the cached grid)
+function drawGrid() {
+    if (gridCache) {
+        ctx.drawImage(gridCache, 0, 0);
     }
 }
 
 // Draw a matrix at a given position
 function drawMatrix(matrix, offset, type = null) {
-    const blockSizeX = canvas.width / COLS;
-    const blockSizeY = canvas.height / ROWS;
-
     matrix.forEach((row, y) => {
         row.forEach((value, x) => {
             if (value !== 0) {
@@ -263,7 +285,7 @@ function drawMatrix(matrix, offset, type = null) {
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 0.5;
 
-                // Calculate the position using the dynamic block size
+                // Calculate the position using the pre-calculated block size
                 const posX = (x + offset.x) * blockSizeX;
                 const posY = (y + offset.y) * blockSizeY;
 
@@ -373,19 +395,39 @@ function playerHardDrop() {
     updateScore();
 }
 
-// Sweep completed lines
+// Sweep completed lines - more efficient version
 function sweep() {
     let lineCount = 0;
-    for (let y = ROWS - 1; y >= 0; y--) {
+    let y = ROWS - 1;
+
+    // Process from bottom to top
+    while (y >= 0) {
         // Check if the entire row is filled
-        if (board[y].every(value => value !== 0)) {
-            // Remove the completed line
-            const row = board.splice(y, 1)[0];
-            // Add a new empty row at the top
-            board.unshift(Array(COLS).fill(0));
+        let isComplete = true;
+        for (let x = 0; x < COLS; x++) {
+            if (board[y][x] === 0) {
+                isComplete = false;
+                break;
+            }
+        }
+
+        if (isComplete) {
+            // Found a complete line, remove it and shift everything down
+            for (let row = y; row > 0; row--) {
+                for (let x = 0; x < COLS; x++) {
+                    board[row][x] = board[row - 1][x];
+                }
+            }
+
+            // Fill the top row with zeros
+            for (let x = 0; x < COLS; x++) {
+                board[0][x] = 0;
+            }
+
             lineCount++;
-            // Since we removed a row, we need to check the same index again
-            y++; // Increment y to recheck the same position after shifting
+            // Don't increment y, check the same position again since we shifted
+        } else {
+            y--; // Move to the next row
         }
     }
 
@@ -418,19 +460,21 @@ function updateScore() {
 }
 
 // Main game update loop
-function update(time = 0) {
-    const deltaTime = time - lastTime;
-    lastTime = time;
-    
+let lastFrameTime = 0;
+function update(currentTime = 0) {
+    // Calculate delta time for consistent movement across different frame rates
+    const deltaTime = currentTime - lastFrameTime;
+    lastFrameTime = currentTime;
+
     if (!paused && !gameOver) {
         dropCounter += deltaTime;
         if (dropCounter > dropInterval) {
             playerDrop();
         }
     }
-    
+
     draw();
-    
+
     if (!gameOver) {
         requestAnimationFrame(update);
     } else {
