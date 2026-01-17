@@ -157,6 +157,51 @@ button:active {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+/* Touch Controls for Mobile */
+.touch-controls {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    background: rgba(25, 25, 35, 0.9);
+    padding: 15px;
+    border-radius: 15px;
+    border: 1px solid rgba(100, 100, 200, 0.3);
+    width: 90%;
+    max-width: 400px;
+}
+
+.control-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 8px 0;
+}
+
+.control-btn {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(to bottom, #4a4a8a, #2a2a5a);
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.control-btn:active {
+    transform: scale(0.95);
+    background: linear-gradient(to bottom, #5a5a9a, #3a3a6a);
+}
+
 @media (max-width: 768px) {
     .game-container {
         flex-direction: column;
@@ -166,5 +211,16 @@ button:active {
 
     h1 {
         font-size: 2rem;
+    }
+
+    /* Show touch controls on mobile */
+    .touch-controls {
+        display: block;
+    }
+
+    .control-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 20px;
     }
 }

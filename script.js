@@ -160,6 +160,47 @@ function init() {
 
     // Focus the canvas element to ensure keyboard events go to the game
     canvas.focus();
+
+    // Initialize touch controls
+    initTouchControls();
+}
+
+// Initialize touch controls for mobile devices
+function initTouchControls() {
+    // Left button
+    document.getElementById('btn-left').addEventListener('click', () => {
+        if (!paused && !gameOver) {
+            playerMove(-1);
+        }
+    });
+
+    // Right button
+    document.getElementById('btn-right').addEventListener('click', () => {
+        if (!paused && !gameOver) {
+            playerMove(1);
+        }
+    });
+
+    // Down button (soft drop)
+    document.getElementById('btn-down').addEventListener('click', () => {
+        if (!paused && !gameOver) {
+            playerDrop();
+        }
+    });
+
+    // Rotate button
+    document.getElementById('btn-rotate').addEventListener('click', () => {
+        if (!paused && !gameOver) {
+            playerRotate(1);
+        }
+    });
+
+    // Hard drop button
+    document.getElementById('btn-hard-drop').addEventListener('click', () => {
+        if (!paused && !gameOver) {
+            playerHardDrop();
+        }
+    });
 }
 
 // Create the game board
