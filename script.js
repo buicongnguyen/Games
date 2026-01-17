@@ -44,7 +44,7 @@ let player = {
 };
 
 // Pre-calculated values for performance
-let blockSizeX, blockSizeY, blockSize;
+let blockSizeX, blockSizeY, blockSize, offsetX, offsetY;
 let gridCache = null;
 
 // Best scores
@@ -62,6 +62,11 @@ function init() {
     blockSizeY = canvas.height / ROWS;
     blockSize = Math.min(blockSizeX, blockSizeY);
 
+    // For square blocks, we'll use blockSize for both dimensions
+    // and center the game board if there's extra space
+    offsetX = (canvas.width - blockSize * COLS) / 2;
+    offsetY = (canvas.height - blockSize * ROWS) / 2;
+
     // Don't scale the context initially - we'll handle sizing in draw functions
     // ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
     // nextCtx.scale(BLOCK_SIZE, BLOCK_SIZE);
@@ -75,6 +80,9 @@ function init() {
     // Initially pause the game until start button is clicked
     paused = true;
 
+    // Set initial button text to "Start"
+    document.getElementById('reset-button').textContent = 'Start';
+
     // Add event listener for pause button
     document.getElementById('pause-button').addEventListener('click', () => {
         // Toggle pause state
@@ -82,13 +90,28 @@ function init() {
         document.getElementById('pause-button').textContent = paused ? 'Resume' : 'Pause';
     });
 
-    // Add event listener for reset button
+    // Add event listener for reset/start button
     document.getElementById('reset-button').addEventListener('click', () => {
-        // Reset the game
-        resetGame();
-        gameOver = false;
-        paused = false; // Start the game immediately after reset
-        document.getElementById('pause-button').textContent = 'Pause';
+        if (gameOver) {
+            // If game is over, reset and start a new game
+            resetGame();
+            gameOver = false;
+            paused = false; // Start the game immediately after reset
+            document.getElementById('reset-button').textContent = 'Reset';
+            document.getElementById('pause-button').textContent = 'Pause';
+        } else if (paused && !gameOver) {
+            // If game is paused, start the game
+            paused = false;
+            document.getElementById('reset-button').textContent = 'Reset';
+            document.getElementById('pause-button').textContent = 'Pause';
+        } else {
+            // If game is running, reset the game
+            resetGame();
+            gameOver = false;
+            paused = false; // Start the game immediately after reset
+            document.getElementById('reset-button').textContent = 'Reset';
+            document.getElementById('pause-button').textContent = 'Pause';
+        }
     });
 
     // Pre-draw the grid to a cached image
@@ -185,6 +208,8 @@ function playerReset() {
         gameOver = true;
         // Update best scores when game actually ends
         updateBestScores();
+        // Update reset button text to "Start" when game is over
+        document.getElementById('reset-button').textContent = 'Start';
         // Update pause button text when game is over
         document.getElementById('pause-button').textContent = 'Pause';
     }
@@ -293,12 +318,12 @@ function createGridCache() {
     gridCanvas.height = canvas.height;
     const gridCtx = gridCanvas.getContext('2d');
 
-    // Draw the grid on the offscreen canvas using square blocks
+    // Draw the grid on the offscreen canvas using square blocks and offset
     // Draw vertical lines
     for (let x = 0; x <= COLS; x++) {
         gridCtx.beginPath();
-        gridCtx.moveTo(x * blockSize, 0);
-        gridCtx.lineTo(x * blockSize, canvas.height);
+        gridCtx.moveTo(offsetX + x * blockSize, offsetY);
+        gridCtx.lineTo(offsetX + x * blockSize, offsetY + ROWS * blockSize);
         gridCtx.strokeStyle = '#222';
         gridCtx.lineWidth = 0.5;
         gridCtx.stroke();
@@ -307,8 +332,8 @@ function createGridCache() {
     // Draw horizontal lines
     for (let y = 0; y <= ROWS; y++) {
         gridCtx.beginPath();
-        gridCtx.moveTo(0, y * blockSize);
-        gridCtx.lineTo(canvas.width, y * blockSize);
+        gridCtx.moveTo(offsetX, offsetY + y * blockSize);
+        gridCtx.lineTo(offsetX + COLS * blockSize, offsetY + y * blockSize);
         gridCtx.strokeStyle = '#222';
         gridCtx.lineWidth = 0.5;
         gridCtx.stroke();
@@ -331,9 +356,9 @@ function drawMatrix(matrix, offset, type = null) {
         row.forEach((value, x) => {
             if (value !== 0) {
                 // Calculate the position using the pre-calculated block size
-                // Use the square block size for both dimensions
-                const posX = (x + offset.x) * blockSize;
-                const posY = (y + offset.y) * blockSize;
+                // Use the square block size for both dimensions and add offset for centering
+                const posX = offsetX + (x + offset.x) * blockSize;
+                const posY = offsetY + (y + offset.y) * blockSize;
 
                 // Create a gradient for 3D effect
                 const gradient = ctx.createLinearGradient(
