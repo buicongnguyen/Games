@@ -161,19 +161,24 @@ function drawNextPiece() {
 
     if (nextPiece) {
         const [piece, type] = nextPiece;
+
+        // Calculate a dynamic block size for the preview
+        const maxPieceSize = Math.max(piece[0].length, piece.length);
+        const blockSize = Math.min(nextCanvas.width / (maxPieceSize + 2), nextCanvas.height / (maxPieceSize + 2));
+
+        // Calculate offsets to center the piece
+        const offsetX = (nextCanvas.width - piece[0].length * blockSize) / 2;
+        const offsetY = (nextCanvas.height - piece.length * blockSize) / 2;
+
         nextCtx.fillStyle = COLORS[type]; // Use the color of the piece
         nextCtx.strokeStyle = '#000';
-        nextCtx.lineWidth = 0.05;
+        nextCtx.lineWidth = 0.5;
 
         piece.forEach((row, y) => {
             row.forEach((value, x) => {
                 if (value !== 0) {
-                    // Calculate position to center the piece in the preview canvas
-                    const offsetX = (nextCanvas.width/BLOCK_SIZE - piece[0].length) / 2;
-                    const offsetY = (nextCanvas.height/BLOCK_SIZE - piece.length) / 2;
-
-                    nextCtx.fillRect((x + offsetX) * BLOCK_SIZE, (y + offsetY) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-                    nextCtx.strokeRect((x + offsetX) * BLOCK_SIZE, (y + offsetY) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    nextCtx.fillRect(offsetX + x * blockSize, offsetY + y * blockSize, blockSize, blockSize);
+                    nextCtx.strokeRect(offsetX + x * blockSize, offsetY + y * blockSize, blockSize, blockSize);
                 }
             });
         });
@@ -197,25 +202,60 @@ function draw() {
     ctx.fillStyle = '#111';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw the board grid
+    // Draw the grid
+    drawGrid();
+
+    // Draw the board
     drawMatrix(board, {x: 0, y: 0});
 
     // Draw the current piece
     drawMatrix(player.matrix[0], player.pos, player.matrix[1]);
 }
 
+// Draw the grid
+function drawGrid() {
+    const blockSizeX = canvas.width / COLS;
+    const blockSizeY = canvas.height / ROWS;
+
+    // Draw vertical lines
+    for (let x = 0; x <= COLS; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * blockSizeX, 0);
+        ctx.lineTo(x * blockSizeX, canvas.height);
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+    }
+
+    // Draw horizontal lines
+    for (let y = 0; y <= ROWS; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * blockSizeY);
+        ctx.lineTo(canvas.width, y * blockSizeY);
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+    }
+}
+
 // Draw a matrix at a given position
 function drawMatrix(matrix, offset, type = null) {
+    const blockSizeX = canvas.width / COLS;
+    const blockSizeY = canvas.height / ROWS;
+
     matrix.forEach((row, y) => {
         row.forEach((value, x) => {
             if (value !== 0) {
                 ctx.fillStyle = COLORS[type || value];
                 ctx.strokeStyle = '#000';
-                ctx.lineWidth = 0.05;
+                ctx.lineWidth = 0.5;
 
-                // Scale the drawing to match the block size
-                ctx.fillRect((x + offset.x) * BLOCK_SIZE, (y + offset.y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-                ctx.strokeRect((x + offset.x) * BLOCK_SIZE, (y + offset.y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                // Calculate the position using the dynamic block size
+                const posX = (x + offset.x) * blockSizeX;
+                const posY = (y + offset.y) * blockSizeY;
+
+                ctx.fillRect(posX, posY, blockSizeX, blockSizeY);
+                ctx.strokeRect(posX, posY, blockSizeX, blockSizeY);
             }
         });
     });
