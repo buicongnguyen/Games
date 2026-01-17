@@ -183,6 +183,8 @@ function playerReset() {
         gameOver = true;
         // Update best scores when game actually ends
         updateBestScores();
+        // Update button text to "Start Game" when game is over
+        document.getElementById('start-button').textContent = 'Start Game';
     }
 
     // Draw next piece preview
