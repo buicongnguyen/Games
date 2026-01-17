@@ -44,7 +44,14 @@ h1 {
     height: 600px;
 }
 
-.side-panel {
+.left-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 180px;
+}
+
+.right-panel {
     display: flex;
     flex-direction: column;
     gap: 20px;
