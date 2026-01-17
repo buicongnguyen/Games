@@ -160,24 +160,25 @@ button:active {
 /* Touch Controls for Mobile */
 .touch-controls {
     display: none;
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+    position: relative;
+    margin-top: 20px;
     z-index: 100;
     background: rgba(25, 25, 35, 0.9);
     padding: 15px;
     border-radius: 15px;
     border: 1px solid rgba(100, 100, 200, 0.3);
-    width: 90%;
+    width: 100%;
     max-width: 400px;
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
 }
 
-.control-row {
+.control-group {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
     gap: 10px;
-    margin: 8px 0;
+    flex: 1;
 }
 
 .control-btn {
@@ -215,12 +216,16 @@ button:active {
 
     /* Show touch controls on mobile */
     .touch-controls {
-        display: block;
+        display: flex;
     }
 
     .control-btn {
         width: 60px;
         height: 60px;
         font-size: 20px;
+    }
+
+    .control-group {
+        align-items: center;
     }
 }
