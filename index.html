@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tetris Game</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -23,8 +24,8 @@
                 <p>No scores yet</p>
             </div>
             <div class="button-group">
-                <button id="pause-button">Pause</button>
-                <button id="reset-button">Reset</button>
+                <button id="pause-button" type="button">Pause</button>
+                <button id="reset-button" type="button">Reset</button>
             </div>
         </div>
         <canvas id="tetris" width="300" height="600" tabindex="0"></canvas>
@@ -39,19 +40,20 @@
                 <h3>Lines: <span id="lines">0</span></h3>
             </div>
         </div>
+    </div>
     <!-- Mobile Touch Controls -->
     <div class="touch-controls" id="draggable-controls">
         <div class="drag-handle">⋮⋮</div>
         <div class="control-row">
-            <button id="btn-rotate" class="control-btn">↻</button>
+            <button id="btn-rotate" class="control-btn" type="button">↻</button>
         </div>
         <div class="control-row">
-            <button id="btn-left" class="control-btn">←</button>
-            <button id="btn-down" class="control-btn">↓</button>
-            <button id="btn-right" class="control-btn">→</button>
+            <button id="btn-left" class="control-btn" type="button">←</button>
+            <button id="btn-down" class="control-btn" type="button">↓</button>
+            <button id="btn-right" class="control-btn" type="button">→</button>
         </div>
         <div class="control-row">
-            <button id="btn-hard-drop" class="control-btn">⤓</button>
+            <button id="btn-hard-drop" class="control-btn" type="button">⤓</button>
         </div>
     </div>
     <script src="script.js"></script>

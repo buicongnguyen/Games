@@ -1,7 +1,6 @@
 // Tetris game constants
 const COLS = 10;
 const ROWS = 20;
-const BLOCK_SIZE = 24;
 const COLORS = [
     null,
     '#FF0D72', // I
@@ -25,6 +24,16 @@ const SHAPES = [
     [[7,7,0], [0,7,7], [0,0,0]]                    // Z
 ];
 
+const PIECE_MAP = {
+    I: { shape: SHAPES[1], type: 1 },
+    J: { shape: SHAPES[2], type: 2 },
+    L: { shape: SHAPES[3], type: 3 },
+    O: { shape: SHAPES[4], type: 4 },
+    S: { shape: SHAPES[5], type: 5 },
+    T: { shape: SHAPES[6], type: 6 },
+    Z: { shape: SHAPES[7], type: 7 }
+};
+
 // Game variables
 let canvas, ctx, nextCanvas, nextCtx;
 let board = [];
@@ -35,8 +44,9 @@ let gameOver = false;
 let paused = false;
 let dropCounter = 0;
 let dropInterval = 1000;
-let lastTime = 0;
 let nextPiece = null;
+let animationFrameId = null;
+let hasStarted = false;
 let player = {
     pos: {x: 0, y: 0},
     matrix: null,
@@ -79,39 +89,23 @@ function init() {
 
     // Initially pause the game until start button is clicked
     paused = true;
-
-    // Set initial button text to "Start"
-    document.getElementById('reset-button').textContent = 'Start';
+    hasStarted = false;
 
     // Add event listener for pause button
     document.getElementById('pause-button').addEventListener('click', () => {
-        // Toggle pause state
-        paused = !paused;
-        document.getElementById('pause-button').textContent = paused ? 'Resume' : 'Pause';
+        togglePause();
     });
 
     // Add event listener for reset/start button
     document.getElementById('reset-button').addEventListener('click', () => {
-        if (gameOver) {
-            // If game is over, reset and start a new game
-            resetGame();
-            gameOver = false;
-            paused = false; // Start the game immediately after reset
-            document.getElementById('reset-button').textContent = 'Reset';
-            document.getElementById('pause-button').textContent = 'Pause';
-        } else if (paused && !gameOver) {
-            // If game is paused, start the game
-            paused = false;
-            document.getElementById('reset-button').textContent = 'Reset';
-            document.getElementById('pause-button').textContent = 'Pause';
-        } else {
-            // If game is running, reset the game
-            resetGame();
-            gameOver = false;
-            paused = false; // Start the game immediately after reset
-            document.getElementById('reset-button').textContent = 'Reset';
-            document.getElementById('pause-button').textContent = 'Pause';
-        }
+        stopGameLoop();
+        resetGame();
+        hasStarted = true;
+        paused = false;
+        updateControlButtons();
+        draw();
+        startGameLoop();
+        canvas.focus();
     });
 
     // Pre-draw the grid to a cached image
@@ -120,8 +114,8 @@ function init() {
     // Initialize best scores
     initBestScores();
 
-    // Start the game loop
-    requestAnimationFrame(update);
+    updateControlButtons();
+    draw();
 
     // Event listeners for controls
     document.addEventListener('keydown', event => {
@@ -133,8 +127,7 @@ function init() {
         if (gameOver) return;
 
         if (event.keyCode === 80) { // P key to pause
-            paused = !paused;
-            document.getElementById('start-button').textContent = paused ? 'Start Game' : 'Pause Game';
+            togglePause();
             return;
         }
 
@@ -206,83 +199,132 @@ function initTouchControls() {
     });
 }
 
+function updateControlButtons() {
+    const pauseButton = document.getElementById('pause-button');
+    const resetButton = document.getElementById('reset-button');
+
+    if (!pauseButton || !resetButton) {
+        return;
+    }
+
+    pauseButton.disabled = !hasStarted || gameOver;
+    pauseButton.textContent = paused && hasStarted ? 'Resume' : 'Pause';
+    resetButton.textContent = !hasStarted || gameOver ? 'Start' : 'Reset';
+}
+
+function togglePause() {
+    if (!hasStarted || gameOver) {
+        return;
+    }
+
+    paused = !paused;
+    updateControlButtons();
+
+    if (!paused) {
+        startGameLoop();
+    } else {
+        stopGameLoop();
+        draw();
+        drawOverlay('PAUSED', 'Press Resume or P to continue', '#FFE138');
+    }
+}
+
+function startGameLoop() {
+    if (animationFrameId !== null) {
+        return;
+    }
+
+    lastFrameTime = 0;
+    animationFrameId = requestAnimationFrame(update);
+}
+
+function stopGameLoop() {
+    if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
+}
+
 // Make the touch controls draggable
 function makeDraggable() {
     const dragElement = document.getElementById('draggable-controls');
+
+    if (!dragElement) {
+        return;
+    }
+
     const dragHandle = dragElement.querySelector('.drag-handle');
+    if (!dragHandle) {
+        return;
+    }
 
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let elementStartLeft = 0;
+    let elementStartTop = 0;
 
-    dragHandle.onmousedown = dragMouseDown;
+    dragHandle.addEventListener('mousedown', event => {
+        event.preventDefault();
+        beginDrag(event.clientX, event.clientY);
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', stopMouseDrag);
+    });
 
-    function dragMouseDown(e) {
-        e = e || window.event;
-        e.preventDefault();
-        // Get the mouse cursor position at startup
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        // Remove transform to allow absolute positioning
+    dragHandle.addEventListener('touchstart', event => {
+        event.preventDefault();
+        const touch = event.touches[0];
+        beginDrag(touch.clientX, touch.clientY);
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
+        document.addEventListener('touchend', stopTouchDrag);
+        document.addEventListener('touchcancel', stopTouchDrag);
+    }, { passive: false });
+
+    function beginDrag(clientX, clientY) {
+        const rect = dragElement.getBoundingClientRect();
+        dragElement.style.top = `${rect.top}px`;
+        dragElement.style.left = `${rect.left}px`;
+        dragElement.style.bottom = 'auto';
+        dragElement.style.right = 'auto';
         dragElement.style.transform = 'none';
-        document.onmouseup = closeDragElement;
-        // Call a function whenever the cursor moves
-        document.onmousemove = elementDrag;
+
+        dragStartX = clientX;
+        dragStartY = clientY;
+        elementStartLeft = rect.left;
+        elementStartTop = rect.top;
     }
 
-    function elementDrag(e) {
-        e = e || window.event;
-        e.preventDefault();
-        // Calculate the new cursor position
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        // Set the element's new position
-        const top = dragElement.offsetTop - pos2;
-        const left = dragElement.offsetLeft - pos1;
-        dragElement.style.top = top + "px";
-        dragElement.style.left = left + "px";
+    function updateDragPosition(clientX, clientY) {
+        const nextLeft = elementStartLeft + (clientX - dragStartX);
+        const nextTop = elementStartTop + (clientY - dragStartY);
+        const maxLeft = Math.max(0, window.innerWidth - dragElement.offsetWidth);
+        const maxTop = Math.max(0, window.innerHeight - dragElement.offsetHeight);
+        const clampedLeft = Math.min(Math.max(0, nextLeft), maxLeft);
+        const clampedTop = Math.min(Math.max(0, nextTop), maxTop);
+
+        dragElement.style.left = `${clampedLeft}px`;
+        dragElement.style.top = `${clampedTop}px`;
     }
 
-    function closeDragElement() {
-        // Stop moving when mouse button is released
-        document.onmouseup = null;
-        document.onmousemove = null;
+    function handleMouseMove(event) {
+        event.preventDefault();
+        updateDragPosition(event.clientX, event.clientY);
     }
 
-    // Touch events for mobile
-    dragHandle.ontouchstart = dragTouchStart;
-
-    function dragTouchStart(e) {
-        e = e || window.event;
-        e.preventDefault();
-        const touch = e.touches[0];
-        pos3 = touch.clientX;
-        pos4 = touch.clientY;
-        // Remove transform to allow absolute positioning
-        dragElement.style.transform = 'none';
-        document.ontouchend = closeDragElementTouch;
-        document.ontouchmove = elementTouchDrag;
+    function handleTouchMove(event) {
+        event.preventDefault();
+        const touch = event.touches[0];
+        updateDragPosition(touch.clientX, touch.clientY);
     }
 
-    function elementTouchDrag(e) {
-        e = e || window.event;
-        e.preventDefault();
-        const touch = e.touches[0];
-        pos1 = pos3 - touch.clientX;
-        pos2 = pos4 - touch.clientY;
-        pos3 = touch.clientX;
-        pos4 = touch.clientY;
-        // Set the element's new position
-        const top = dragElement.offsetTop - pos2;
-        const left = dragElement.offsetLeft - pos1;
-        dragElement.style.top = top + "px";
-        dragElement.style.left = left + "px";
+    function stopMouseDrag() {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', stopMouseDrag);
     }
 
-    function closeDragElementTouch() {
-        // Stop moving when touch is ended
-        document.ontouchend = null;
-        document.ontouchmove = null;
+    function stopTouchDrag() {
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', stopTouchDrag);
+        document.removeEventListener('touchcancel', stopTouchDrag);
     }
 }
 
@@ -300,8 +342,10 @@ function resetGame() {
     level = 1;
     lines = 0;
     gameOver = false;
-    paused = false;
     dropInterval = 1000;
+    dropCounter = 0;
+    lastFrameTime = 0;
+    nextPiece = null;
 
     // Clear the board
     createBoard();
@@ -335,10 +379,7 @@ function playerReset() {
         gameOver = true;
         // Update best scores when game actually ends
         updateBestScores();
-        // Update reset button text to "Start" when game is over
-        document.getElementById('reset-button').textContent = 'Start';
-        // Update pause button text when game is over
-        document.getElementById('pause-button').textContent = 'Pause';
+        updateControlButtons();
     }
 
     // Draw next piece preview
@@ -412,13 +453,12 @@ function drawNextPiece() {
 
 // Create a piece based on the type
 function createPiece(type) {
-    if (type === 'I') return [SHAPES[1], 1];
-    if (type === 'J') return [SHAPES[2], 2];
-    if (type === 'L') return [SHAPES[3], 3];
-    if (type === 'O') return [SHAPES[4], 4];
-    if (type === 'S') return [SHAPES[5], 5];
-    if (type === 'T') return [SHAPES[6], 6];
-    if (type === 'Z') return [SHAPES[7], 7];
+    const piece = PIECE_MAP[type];
+    if (!piece) {
+        throw new Error(`Unknown piece type: ${type}`);
+    }
+
+    return [piece.shape.map(row => [...row]), piece.type];
 }
 
 // Draw the game board and current piece
@@ -434,7 +474,9 @@ function draw() {
     drawMatrix(board, {x: 0, y: 0});
 
     // Draw the current piece
-    drawMatrix(player.matrix[0], player.pos, player.matrix[1]);
+    if (player.matrix) {
+        drawMatrix(player.matrix[0], player.pos, player.matrix[1]);
+    }
 }
 
 // Create a cached grid image to avoid redrawing every frame
@@ -530,7 +572,7 @@ function drawMatrix(matrix, offset, type = null) {
 
 // Check for collision
 function collide() {
-    const [matrix, type] = player.matrix;
+    const [matrix] = player.matrix;
     for (let y = 0; y < matrix.length; y++) {
         for (let x = 0; x < matrix[y].length; x++) {
             if (matrix[y][x] !== 0) {
@@ -602,15 +644,20 @@ function rotate(matrix, dir) {
     }
 }
 
+function lockPiece() {
+    merge();
+    sweep();
+    playerReset();
+    updateScore();
+    updateControlButtons();
+}
+
 // Drop the player's piece
 function playerDrop() {
     player.pos.y++;
     if (collide()) {
         player.pos.y--;
-        merge();
-        playerReset();
-        sweep();
-        updateScore();
+        lockPiece();
     }
     dropCounter = 0;
 }
@@ -621,10 +668,8 @@ function playerHardDrop() {
         player.pos.y++;
     }
     player.pos.y--;
-    merge();
-    playerReset();
-    sweep();
-    updateScore();
+    lockPiece();
+    dropCounter = 0;
 }
 
 // Sweep completed lines - more efficient version
@@ -686,10 +731,19 @@ function sweep() {
 
 // Initialize best scores from localStorage
 function initBestScores() {
-    const savedScores = localStorage.getItem('tetrisBestScores');
-    if (savedScores) {
-        bestScores = JSON.parse(savedScores);
-    } else {
+    try {
+        const savedScores = localStorage.getItem('tetrisBestScores');
+        if (savedScores) {
+            const parsedScores = JSON.parse(savedScores);
+            bestScores = Array.isArray(parsedScores)
+                ? parsedScores.filter(score => Number.isFinite(score))
+                : [];
+            bestScores.sort((a, b) => b - a);
+            bestScores = bestScores.slice(0, 3);
+        } else {
+            bestScores = [];
+        }
+    } catch (error) {
         bestScores = [];
     }
     updateBestScoresDisplay();
@@ -697,6 +751,11 @@ function initBestScores() {
 
 // Update best scores and save to localStorage
 function updateBestScores() {
+    if (score <= 0) {
+        updateBestScoresDisplay();
+        return;
+    }
+
     // Only add the score if it's high enough to be in the top 3
     // or if we don't have 3 scores yet
     if (bestScores.length < 3 || score > bestScores[bestScores.length - 1]) {
@@ -708,7 +767,11 @@ function updateBestScores() {
         bestScores = bestScores.slice(0, 3);
 
         // Save to localStorage
-        localStorage.setItem('tetrisBestScores', JSON.stringify(bestScores));
+        try {
+            localStorage.setItem('tetrisBestScores', JSON.stringify(bestScores));
+        } catch (error) {
+            // Ignore storage failures so game-over flow still completes.
+        }
     }
 
     updateBestScoresDisplay();
@@ -750,9 +813,31 @@ function updateScore() {
     document.getElementById('lines').textContent = lines;
 }
 
+function drawOverlay(title, subtitle, titleColor) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.font = '30px Arial';
+    ctx.fillStyle = titleColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 20);
+
+    ctx.font = '20px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+    ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 60);
+}
+
 // Main game update loop
 let lastFrameTime = 0;
 function update(currentTime = 0) {
+    animationFrameId = null;
+
+    if (lastFrameTime === 0) {
+        lastFrameTime = currentTime;
+    }
+
     // Calculate delta time for consistent movement across different frame rates
     const deltaTime = currentTime - lastFrameTime;
     lastFrameTime = currentTime;
@@ -766,25 +851,12 @@ function update(currentTime = 0) {
 
     draw();
 
-    if (!gameOver) {
-        requestAnimationFrame(update);
+    if (!gameOver && hasStarted && !paused) {
+        animationFrameId = requestAnimationFrame(update);
     } else {
-        // Display game over message
-        // Draw semi-transparent overlay
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw game over text
-        ctx.font = '30px Arial';
-        ctx.fillStyle = '#FF4136';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
-
-        ctx.font = '20px Arial';
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
-        ctx.fillText('Press Start to play again', canvas.width / 2, canvas.height / 2 + 60);
+        if (gameOver) {
+            drawOverlay('GAME OVER', 'Press Start to play again', '#FF4136');
+        }
     }
 }
 

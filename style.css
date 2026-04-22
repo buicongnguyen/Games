@@ -11,8 +11,10 @@ body {
 }
 
 .game-container {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(180px, 220px) auto minmax(180px, 220px);
     gap: 20px;
+    align-items: start;
     background: rgba(25, 25, 35, 0.8);
     border-radius: 15px;
     padding: 25px;
@@ -40,8 +42,9 @@ h1 {
     image-rendering: -webkit-crisp-edges;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    width: 300px;
-    height: 600px;
+    width: min(300px, 100%);
+    height: auto;
+    aspect-ratio: 1 / 2;
 }
 
 .left-panel {
@@ -49,6 +52,7 @@ h1 {
     flex-direction: column;
     gap: 20px;
     min-width: 180px;
+    width: 100%;
 }
 
 .right-panel {
@@ -56,6 +60,7 @@ h1 {
     flex-direction: column;
     gap: 20px;
     min-width: 180px;
+    width: 100%;
 }
 
 .next-piece-container {
@@ -157,6 +162,13 @@ button:active {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
 /* Touch Controls for Mobile */
 .touch-controls {
     display: none;
@@ -172,6 +184,9 @@ button:active {
     width: 90%;
     max-width: 400px;
     cursor: move;
+    flex-direction: column;
+    align-items: center;
+    touch-action: none;
     /* Allow dragging anywhere - remove transform when dragged */
 }
 
@@ -213,6 +228,7 @@ button:active {
     display: flex;
     justify-content: center;
     align-items: center;
+    touch-action: manipulation;
 }
 
 .control-btn:active {
@@ -223,13 +239,18 @@ button:active {
 
 @media (max-width: 768px) {
     .game-container {
-        flex-direction: column;
-        align-items: center;
+        grid-template-columns: 1fr;
         padding: 15px;
+        width: min(100%, 360px);
     }
 
     h1 {
         font-size: 2rem;
+    }
+
+    .left-panel,
+    .right-panel {
+        min-width: 0;
     }
 
     /* Show touch controls on mobile */
@@ -243,7 +264,7 @@ button:active {
         font-size: 20px;
     }
 
-    .control-group {
-        align-items: center;
+    .control-row {
+        width: 100%;
     }
 }
