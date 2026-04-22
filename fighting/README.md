@@ -1,6 +1,6 @@
 # Sky Drill
 
-A fictional arcade campaign prototype with three chapters.
+A fictional arcade campaign prototype with three chapters, now using generated chapter background art for a more polished test build.
 
 Chapter 1 has six bombing levels: three single-target buildings, then three group-target buildings where the pod count is much lower than the target count. The bomb setup panel supports all-pod or next-pod settings, drill depth, bounce count, fuse delay, and blast radius.
 

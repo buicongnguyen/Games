@@ -327,7 +327,25 @@
       this.lastHud = "";
     }
 
+    preload() {
+      this.load.image("bg-bombing", "assets/chapter1-bombing-bg.png");
+      this.load.image("bg-ship", "assets/chapter2-canal-bg.png");
+      this.load.image("bg-heli", "assets/chapter3-heli-bg.png");
+    }
+
     create() {
+      this.chapterBackgrounds = {
+        bombing: this.add.image(0, 0, "bg-bombing"),
+        ship: this.add.image(0, 0, "bg-ship"),
+        heli: this.add.image(0, 0, "bg-heli"),
+      };
+      Object.values(this.chapterBackgrounds).forEach((image) => {
+        image.setOrigin(0, 0);
+        image.setDisplaySize(WORLD.width, WORLD.height);
+        image.setDepth(-20);
+        image.setVisible(false);
+      });
+      this.setChapterBackground("bombing");
       this.bg = this.add.graphics();
       this.map = this.add.graphics();
       this.dynamic = this.add.graphics();
@@ -340,6 +358,15 @@
       this.showBombingControls(true);
       this.refreshHud(true);
       this.showMessage("Chapter 1-1: one target, one pod");
+    }
+
+    setChapterBackground(mode) {
+      if (!this.chapterBackgrounds) {
+        return;
+      }
+      Object.entries(this.chapterBackgrounds).forEach(([key, image]) => {
+        image.setVisible(key === mode);
+      });
     }
 
     wireControls() {
@@ -550,6 +577,7 @@
 
     loadBombingLevel(levelIndex, carryScore, message) {
       this.mode = "bombing";
+      this.setChapterBackground("bombing");
       this.score = carryScore;
       this.bombing = makeBombingLevel(levelIndex, carryScore);
       this.plane.x = -90;
@@ -889,6 +917,13 @@
     }
 
     drawBombingBackground() {
+      if (this.chapterBackgrounds) {
+        this.bg.fillStyle(0x041018, 0.08);
+        this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
+        this.bg.lineStyle(3, 0xf4f7f9, 0.32);
+        this.bg.strokeRoundedRect(MAP.x - 22, MAP.y - 18, MAP.width + 44, MAP.height + 40, 12);
+        return;
+      }
       this.bg.fillGradientStyle(palette.skyTop, palette.skyTop, palette.skyMid, palette.skyMid, 1);
       this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
       this.bg.fillStyle(0xffffff, 0.18);
@@ -1095,6 +1130,7 @@
 
     loadShipLevel(levelIndex, carryScore, message) {
       this.mode = "ship";
+      this.setChapterBackground("ship");
       this.score = carryScore;
       const level = SHIP_LEVELS[levelIndex];
       this.showBombingControls(false);
@@ -1252,21 +1288,26 @@
 
     drawShip() {
       const state = this.ship;
-      this.bg.fillStyle(0x7fb7ce, 1);
-      this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
-      this.bg.fillStyle(palette.bank, 1);
-      this.bg.fillRect(0, 0, 238, WORLD.height);
-      this.bg.fillRect(722, 0, 238, WORLD.height);
-      this.bg.fillStyle(0x405336, 1);
-      this.bg.fillRect(0, 0, 180, WORLD.height);
-      this.bg.fillRect(780, 0, 180, WORLD.height);
-      this.bg.fillStyle(palette.river, 1);
-      this.bg.fillRoundedRect(238, -20, 484, WORLD.height + 40, 14);
-      this.bg.fillStyle(palette.riverDark, 0.28);
-      for (let y = -80 + (state.scroll % 96); y < WORLD.height + 90; y += 96) {
-        this.bg.fillRoundedRect(468, y, 24, 64, 10);
-        this.bg.fillRoundedRect(360, y + 30, 14, 50, 8);
-        this.bg.fillRoundedRect(590, y + 12, 14, 50, 8);
+      if (this.chapterBackgrounds) {
+        this.bg.fillStyle(0x052230, 0.12);
+        this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
+      } else {
+        this.bg.fillStyle(0x7fb7ce, 1);
+        this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
+        this.bg.fillStyle(palette.bank, 1);
+        this.bg.fillRect(0, 0, 238, WORLD.height);
+        this.bg.fillRect(722, 0, 238, WORLD.height);
+        this.bg.fillStyle(0x405336, 1);
+        this.bg.fillRect(0, 0, 180, WORLD.height);
+        this.bg.fillRect(780, 0, 180, WORLD.height);
+        this.bg.fillStyle(palette.river, 1);
+        this.bg.fillRoundedRect(238, -20, 484, WORLD.height + 40, 14);
+        this.bg.fillStyle(palette.riverDark, 0.28);
+        for (let y = -80 + (state.scroll % 96); y < WORLD.height + 90; y += 96) {
+          this.bg.fillRoundedRect(468, y, 24, 64, 10);
+          this.bg.fillRoundedRect(360, y + 30, 14, 50, 8);
+          this.bg.fillRoundedRect(590, y + 12, 14, 50, 8);
+        }
       }
 
       for (const gun of state.guns) {
@@ -1315,6 +1356,7 @@
 
     loadHeliLevel(levelIndex, carryScore, message) {
       this.mode = "heli";
+      this.setChapterBackground("heli");
       this.score = carryScore;
       const level = HELI_LEVELS[levelIndex];
       this.showBombingControls(false);
@@ -1518,17 +1560,22 @@
 
     drawHeli() {
       const state = this.heli;
-      this.bg.fillStyle(0x79906f, 1);
-      this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
-      this.bg.fillStyle(0x4b5d47, 1);
-      this.bg.fillTriangle(0, 0, 280, 0, 0, 540);
-      this.bg.fillTriangle(960, 0, 720, 0, 960, 540);
-      this.bg.fillStyle(palette.river, 0.92);
-      this.bg.fillRoundedRect(410, -20, 138, 580, 34);
-      this.bg.fillStyle(0x6c766b, 1);
-      this.bg.fillEllipse(260, 230, 270, 170);
-      this.bg.fillEllipse(660, 294, 310, 190);
-      this.bg.fillEllipse(560, 116, 220, 120);
+      if (this.chapterBackgrounds) {
+        this.bg.fillStyle(0x07150c, 0.1);
+        this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
+      } else {
+        this.bg.fillStyle(0x79906f, 1);
+        this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
+        this.bg.fillStyle(0x4b5d47, 1);
+        this.bg.fillTriangle(0, 0, 280, 0, 0, 540);
+        this.bg.fillTriangle(960, 0, 720, 0, 960, 540);
+        this.bg.fillStyle(palette.river, 0.92);
+        this.bg.fillRoundedRect(410, -20, 138, 580, 34);
+        this.bg.fillStyle(0x6c766b, 1);
+        this.bg.fillEllipse(260, 230, 270, 170);
+        this.bg.fillEllipse(660, 294, 310, 190);
+        this.bg.fillEllipse(560, 116, 220, 120);
+      }
 
       for (const hole of state.holes) {
         const closed = hole.state === "closed";
