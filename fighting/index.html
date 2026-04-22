@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sky Drill</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="stage" aria-label="Sky Drill game">
+        <div id="game-root" class="game-root"></div>
+
+        <header class="hud hud-top" aria-label="Game status">
+          <div class="brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span>Sky Drill</span>
+          </div>
+          <div class="stats">
+            <span>Targets <strong id="targets-value">0/0</strong></span>
+            <span>Pods <strong id="pods-value">0</strong></span>
+            <span>Score <strong id="score-value">0</strong></span>
+          </div>
+        </header>
+
+        <section class="hud controls" aria-label="Drop controls">
+          <label class="control">
+            <span>Angle</span>
+            <input id="angle-input" type="range" min="-55" max="55" step="1" value="12" />
+            <output id="angle-output">12 deg</output>
+          </label>
+          <label class="control">
+            <span>Drill speed</span>
+            <input id="speed-input" type="range" min="160" max="520" step="10" value="330" />
+            <output id="speed-output">330</output>
+          </label>
+          <label class="control">
+            <span>Drop delay</span>
+            <input id="delay-input" type="range" min="0" max="1.8" step="0.05" value="0.45" />
+            <output id="delay-output">0.45 s</output>
+          </label>
+          <button id="drop-button" class="primary" type="button" title="Drop pod">
+            <i data-lucide="send" aria-hidden="true"></i>
+            <span>Drop</span>
+          </button>
+          <button id="reset-button" class="icon-button" type="button" title="Reset">
+            <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+            <span class="sr-only">Reset</span>
+          </button>
+        </section>
+
+        <div id="message" class="message" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+    <script src="./src/game.js"></script>
+  </body>
+</html>
