@@ -249,6 +249,16 @@ button svg {
     aspect-ratio: auto;
   }
 
+  .game-root {
+    inset: 96px 0 auto;
+    height: 270px !important;
+  }
+
+  .game-root canvas {
+    inset: 0;
+    height: 100% !important;
+  }
+
   .hud-top {
     align-items: flex-start;
     flex-direction: column;

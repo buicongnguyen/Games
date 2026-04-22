@@ -9,7 +9,6 @@
   const MAP = { x: 56, y: 112, width: 848, height: 344 };
   const SURFACE_Y = 394;
   const GRAVITY = 450;
-  const MAX_PODS = 6;
 
   const els = {
     angle: document.getElementById("angle-input"),
@@ -20,6 +19,7 @@
     delayOut: document.getElementById("delay-output"),
     drop: document.getElementById("drop-button"),
     reset: document.getElementById("reset-button"),
+    stage: document.getElementById("stage-value"),
     targets: document.getElementById("targets-value"),
     pods: document.getElementById("pods-value"),
     score: document.getElementById("score-value"),
@@ -42,35 +42,117 @@
     smoke: 0xf4f7f9,
   };
 
-  function makeLevel() {
-    const buildings = [
-      createBuilding("A", 202, 238, 104, 156, 4, 4),
-      createBuilding("B", 396, 206, 132, 188, 5, 5),
-      createBuilding("C", 636, 254, 118, 140, 4, 4),
-    ];
+  const LEVELS = [
+    {
+      name: "Stage 1",
+      pods: 6,
+      planeSpeed: 96,
+      podRadius: 6,
+      drillRadius: 11,
+      targetScale: 0.58,
+      targetHitRadius: 5,
+      bonusPerPod: 35,
+      buildings: [
+        { id: "A", x: 202, y: 238, width: 104, height: 156, cols: 4, rows: 4 },
+        { id: "B", x: 396, y: 206, width: 132, height: 188, cols: 5, rows: 5 },
+        { id: "C", x: 636, y: 254, width: 118, height: 140, cols: 4, rows: 4 },
+      ],
+      targets: [
+        { x: 240, y: 384 },
+        { x: 455, y: 382 },
+        { x: 704, y: 385 },
+      ],
+    },
+    {
+      name: "Stage 2",
+      pods: 5,
+      planeSpeed: 108,
+      podRadius: 5.5,
+      drillRadius: 9.5,
+      targetScale: 0.54,
+      targetHitRadius: 4.5,
+      bonusPerPod: 45,
+      buildings: [
+        { id: "A", x: 166, y: 250, width: 96, height: 144, cols: 3, rows: 4 },
+        { id: "B", x: 330, y: 194, width: 124, height: 200, cols: 4, rows: 5, healthScale: 1.05 },
+        { id: "C", x: 536, y: 224, width: 108, height: 170, cols: 4, rows: 5 },
+        { id: "D", x: 728, y: 272, width: 82, height: 122, cols: 3, rows: 3 },
+      ],
+      targets: [
+        { x: 213, y: 386 },
+        { x: 386, y: 382 },
+        { x: 589, y: 382 },
+        { x: 770, y: 386 },
+      ],
+    },
+    {
+      name: "Stage 3",
+      pods: 4,
+      planeSpeed: 122,
+      podRadius: 5,
+      drillRadius: 8.5,
+      targetScale: 0.5,
+      targetHitRadius: 4,
+      bonusPerPod: 60,
+      buildings: [
+        { id: "A", x: 188, y: 206, width: 90, height: 188, cols: 3, rows: 5, healthScale: 1.08 },
+        { id: "B", x: 352, y: 230, width: 108, height: 164, cols: 4, rows: 4 },
+        { id: "C", x: 548, y: 182, width: 118, height: 212, cols: 4, rows: 6, healthScale: 1.1 },
+        { id: "D", x: 732, y: 244, width: 92, height: 150, cols: 3, rows: 4 },
+      ],
+      targets: [
+        { x: 232, y: 383 },
+        { x: 405, y: 386 },
+        { x: 604, y: 378 },
+        { x: 778, y: 384 },
+      ],
+    },
+  ];
 
-    const targets = [
-      { id: "t1", x: 240, y: 380, alive: true },
-      { id: "t2", x: 455, y: 377, alive: true },
-      { id: "t3", x: 704, y: 381, alive: true },
-    ];
+  function makeLevel(stageIndex, score) {
+    const level = LEVELS[stageIndex];
+    const buildings = level.buildings.map((building) =>
+      createBuilding(
+        building.id,
+        building.x,
+        building.y,
+        building.width,
+        building.height,
+        building.cols,
+        building.rows,
+        building.healthScale || 1
+      )
+    );
+
+    const targets = level.targets.map((target, index) => ({
+      id: `s${stageIndex + 1}-t${index + 1}`,
+      x: target.x,
+      y: target.y,
+      scale: level.targetScale,
+      hitRadius: level.targetHitRadius,
+      alive: true,
+    }));
 
     return {
+      stageIndex,
+      stageStartScore: score,
+      level,
       buildings,
       targets,
-      podsLeft: MAX_PODS,
-      score: 0,
+      podsLeft: level.pods,
+      score,
       shots: [],
       activePods: [],
       pendingDrop: null,
       fx: [],
       finished: false,
+      advanceAt: 0,
       messageUntil: 0,
       cameraKick: 0,
     };
   }
 
-  function createBuilding(id, x, y, width, height, cols, rows) {
+  function createBuilding(id, x, y, width, height, cols, rows, healthScale) {
     const blocks = [];
     const bw = width / cols;
     const bh = height / rows;
@@ -83,8 +165,8 @@
           y: y + row * bh,
           width: bw,
           height: bh,
-          health: row === rows - 1 ? 60 : 42,
-          maxHealth: row === rows - 1 ? 60 : 42,
+          health: (row === rows - 1 ? 60 : 42) * healthScale,
+          maxHealth: (row === rows - 1 ? 60 : 42) * healthScale,
           destroyed: false,
         };
         blocks.push(block);
@@ -106,18 +188,19 @@
     return dx * dx + dy * dy <= radius * radius;
   }
 
-  function drawStickFigure(graphics, x, y, color, alpha) {
-    graphics.lineStyle(3, color, alpha);
-    graphics.strokeCircle(x, y - 20, 6);
+  function drawStickFigure(graphics, x, y, color, alpha, scale) {
+    const s = scale || 1;
+    graphics.lineStyle(Math.max(1.4, 3 * s), color, alpha);
+    graphics.strokeCircle(x, y - 20 * s, 6 * s);
     graphics.beginPath();
-    graphics.moveTo(x, y - 14);
-    graphics.lineTo(x, y + 4);
-    graphics.moveTo(x - 10, y - 7);
-    graphics.lineTo(x + 10, y - 7);
-    graphics.moveTo(x, y + 4);
-    graphics.lineTo(x - 9, y + 17);
-    graphics.moveTo(x, y + 4);
-    graphics.lineTo(x + 9, y + 17);
+    graphics.moveTo(x, y - 14 * s);
+    graphics.lineTo(x, y + 4 * s);
+    graphics.moveTo(x - 10 * s, y - 7 * s);
+    graphics.lineTo(x + 10 * s, y - 7 * s);
+    graphics.moveTo(x, y + 4 * s);
+    graphics.lineTo(x - 9 * s, y + 17 * s);
+    graphics.moveTo(x, y + 4 * s);
+    graphics.lineTo(x + 9 * s, y + 17 * s);
     graphics.strokePath();
   }
 
@@ -146,8 +229,8 @@
   class SkyDrillScene extends Phaser.Scene {
     constructor() {
       super("SkyDrillScene");
-      this.state = makeLevel();
-      this.plane = { x: -90, y: 78, speed: 96, banking: 0 };
+      this.state = makeLevel(0, 0);
+      this.plane = { x: -90, y: 78, speed: this.state.level.planeSpeed, banking: 0 };
       this.elapsed = 0;
       this.lastHud = "";
     }
@@ -161,7 +244,7 @@
       this.drawBackground();
       this.wireControls();
       this.refreshHud(true);
-      this.showMessage("Fictional island drill range active");
+      this.showMessage("Stage 1: precision range active");
     }
 
     wireControls() {
@@ -186,12 +269,17 @@
     }
 
     resetLevel() {
-      this.state = makeLevel();
+      this.loadStage(this.state.stageIndex, this.state.stageStartScore, `${this.state.level.name} reset`);
+    }
+
+    loadStage(stageIndex, carryScore, message) {
+      this.state = makeLevel(stageIndex, carryScore);
       this.plane.x = -90;
       this.plane.y = 78;
+      this.plane.speed = this.state.level.planeSpeed;
       this.elapsed = 0;
       els.drop.disabled = false;
-      this.showMessage("Range reset");
+      this.showMessage(message || `${this.state.level.name}: precision range active`);
       this.refreshHud(true);
     }
 
@@ -220,6 +308,7 @@
       const angleDeg = Number(els.angle.value);
       const speed = Number(els.speed.value);
       const radians = Phaser.Math.DegToRad(angleDeg);
+      const level = this.state.level;
       const pod = {
         x: this.plane.x,
         y: this.plane.y + 18,
@@ -227,9 +316,9 @@
         prevY: this.plane.y + 18,
         vx: this.plane.speed + Math.sin(radians) * speed * 0.68,
         vy: Math.cos(radians) * speed,
-        radius: 9,
-        drillRadius: 20,
-        energy: speed * 0.85,
+        radius: level.podRadius,
+        drillRadius: level.drillRadius,
+        energy: speed * 0.76,
         dead: false,
         age: 0,
         trail: [],
@@ -247,6 +336,7 @@
       this.updatePendingDrop();
       this.updatePods(dt);
       this.updateFx(dt);
+      this.updateStageAdvance();
       this.drawState();
       this.refreshHud();
       this.updateMessage();
@@ -268,6 +358,17 @@
 
       if (this.elapsed >= pending.releaseAt) {
         this.releasePod();
+      }
+    }
+
+    updateStageAdvance() {
+      if (!this.state.advanceAt || this.elapsed < this.state.advanceAt) {
+        return;
+      }
+
+      const nextStage = this.state.stageIndex + 1;
+      if (nextStage < LEVELS.length) {
+        this.loadStage(nextStage, this.state.score, `${LEVELS[nextStage].name}: tighter target lane`);
       }
     }
 
@@ -298,7 +399,7 @@
 
         if (pod.y > MAP.y + MAP.height + 55 || pod.x < -80 || pod.x > WORLD.width + 80 || pod.energy <= 0) {
           pod.dead = true;
-          this.makeBurst(pod.x, pod.y, pod.energy <= 0 ? palette.pod : palette.smoke, 12);
+          this.makeBurst(pod.x, pod.y, pod.energy <= 0 ? palette.pod : palette.smoke, 7, 0.62);
         }
       }
 
@@ -314,7 +415,7 @@
         const alive = this.state.targets.some((target) => target.alive);
         if (alive) {
           this.state.finished = true;
-          this.showMessage("Run complete");
+          this.showMessage(`${this.state.level.name} failed - reset to retry`);
         }
       }
     }
@@ -355,20 +456,20 @@
             const damage = 180 * dt + radius * 0.9;
             block.health -= damage;
             this.state.fx.push({
-              x: x + Phaser.Math.Between(-8, 8),
-              y: y + Phaser.Math.Between(-8, 8),
-              vx: Phaser.Math.Between(-24, 24),
-              vy: Phaser.Math.Between(-40, 10),
-              life: 0.45,
-              maxLife: 0.45,
-              size: Phaser.Math.Between(3, 7),
+              x: x + Phaser.Math.Between(-5, 5),
+              y: y + Phaser.Math.Between(-5, 5),
+              vx: Phaser.Math.Between(-18, 18),
+              vy: Phaser.Math.Between(-30, 8),
+              life: 0.34,
+              maxLife: 0.34,
+              size: Phaser.Math.Between(2, 4),
               color: palette.blockCrack,
             });
 
             if (block.health <= 0) {
               block.destroyed = true;
               this.state.score += 4;
-              this.makeBurst(block.x + block.width / 2, block.y + block.height / 2, palette.buildingDark, 9);
+              this.makeBurst(block.x + block.width / 2, block.y + block.height / 2, palette.buildingDark, 5, 0.58);
             }
           }
         }
@@ -383,9 +484,9 @@
           y: Math.min(y, SURFACE_Y + 52),
           vx: Phaser.Math.Between(-32, 32),
           vy: Phaser.Math.Between(-22, 8),
-          life: 0.55,
-          maxLife: 0.55,
-          size: Phaser.Math.Between(3, 6),
+          life: 0.42,
+          maxLife: 0.42,
+          size: Phaser.Math.Between(2, 4),
           color: palette.islandDark,
         });
       }
@@ -397,34 +498,40 @@
           continue;
         }
 
-        const distance = Math.hypot(pod.x - target.x, pod.y - (target.y - 8));
-        if (distance < pod.drillRadius + 11) {
+        const distance = Math.hypot(pod.x - target.x, pod.y - (target.y - 8 * target.scale));
+        if (distance < pod.drillRadius + target.hitRadius) {
           target.alive = false;
           this.state.score += 120;
-          this.makeBurst(target.x, target.y - 14, palette.targetDone, 18);
+          this.makeBurst(target.x, target.y - 14 * target.scale, palette.targetDone, 10, 0.58);
           this.showMessage("Target marked");
         }
       }
 
       if (!this.state.finished && this.state.targets.every((target) => !target.alive)) {
         this.state.finished = true;
-        this.state.score += this.state.podsLeft * 35;
-        this.showMessage("All targets marked");
+        this.state.score += this.state.podsLeft * this.state.level.bonusPerPod;
+        if (this.state.stageIndex < LEVELS.length - 1) {
+          this.state.advanceAt = this.elapsed + 1.65;
+          this.showMessage(`${this.state.level.name} clear`);
+        } else {
+          this.showMessage("All stages clear");
+        }
       }
     }
 
-    makeBurst(x, y, color, count) {
+    makeBurst(x, y, color, count, sizeScale) {
+      const scale = sizeScale || 1;
       for (let i = 0; i < count; i += 1) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = Phaser.Math.Between(35, 130);
+        const speed = Phaser.Math.Between(24, 86) * scale;
         this.state.fx.push({
           x,
           y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: Phaser.Math.FloatBetween(0.35, 0.85),
-          maxLife: 0.85,
-          size: Phaser.Math.Between(3, 8),
+          life: Phaser.Math.FloatBetween(0.28, 0.62),
+          maxLife: 0.62,
+          size: Phaser.Math.Between(2, 5) * scale,
           color,
         });
       }
@@ -523,7 +630,7 @@
       let vx = this.plane.speed + Math.sin(radians) * speed * 0.68;
       let vy = Math.cos(radians) * speed;
 
-      this.trajectory.lineStyle(2, palette.pod, 0.34);
+      this.trajectory.lineStyle(1, palette.pod, 0.28);
       this.trajectory.beginPath();
       this.trajectory.moveTo(x, y);
       for (let i = 0; i < 42; i += 1) {
@@ -541,7 +648,7 @@
       }
       this.trajectory.strokePath();
       this.trajectory.fillStyle(palette.pod, 0.6);
-      this.trajectory.fillCircle(futureX, futureY, 5);
+      this.trajectory.fillCircle(futureX, futureY, 3);
     }
 
     wrapPlaneX(x) {
@@ -614,9 +721,14 @@
       for (const target of this.state.targets) {
         const color = target.alive ? palette.target : palette.targetDone;
         const alpha = target.alive ? 1 : 0.52;
+        const s = target.scale;
+        const boxW = 30 * s + 8;
+        const boxH = 54 * s + 8;
         this.map.fillStyle(0x0b1117, target.alive ? 0.72 : 0.38);
-        this.map.fillRoundedRect(target.x - 22, target.y - 42, 44, 66, 6);
-        drawStickFigure(this.map, target.x, target.y, color, alpha);
+        this.map.fillRoundedRect(target.x - boxW / 2, target.y - boxH + 10 * s, boxW, boxH, 4);
+        this.map.lineStyle(1, color, target.alive ? 0.42 : 0.24);
+        this.map.strokeCircle(target.x, target.y - 8 * s, target.hitRadius);
+        drawStickFigure(this.map, target.x, target.y, color, alpha, s);
       }
     }
 
@@ -625,18 +737,19 @@
         for (let i = 0; i < pod.trail.length; i += 1) {
           const point = pod.trail[i];
           const a = i / pod.trail.length;
-          this.dynamic.fillStyle(palette.pod, 0.08 + a * 0.2);
-          this.dynamic.fillCircle(point.x, point.y, 3 + a * 4);
+          this.dynamic.fillStyle(palette.pod, 0.06 + a * 0.16);
+          this.dynamic.fillCircle(point.x, point.y, 1.2 + a * pod.radius * 0.54);
         }
 
         const rotation = Math.atan2(pod.vy, pod.vx);
+        const r = pod.radius;
         this.dynamic.save();
         this.dynamic.translateCanvas(pod.x, pod.y);
         this.dynamic.rotateCanvas(rotation);
         this.dynamic.fillStyle(palette.pod, 1);
-        this.dynamic.fillRoundedRect(-12, -6, 24, 12, 5);
+        this.dynamic.fillRoundedRect(-1.45 * r, -0.72 * r, 2.9 * r, 1.44 * r, 3);
         this.dynamic.fillStyle(0x1a2027, 1);
-        this.dynamic.fillTriangle(10, -8, 22, 0, 10, 8);
+        this.dynamic.fillTriangle(1.18 * r, -0.88 * r, 2.4 * r, 0, 1.18 * r, 0.88 * r);
         this.dynamic.restore();
       }
     }
@@ -651,9 +764,9 @@
       const x = this.wrapPlaneX(pending.startX + this.plane.speed * pending.delay);
       const y = this.plane.y + 18;
       this.dynamic.lineStyle(2, palette.pod, 0.8);
-      this.dynamic.strokeCircle(x, y, 12 + progress * 16);
+      this.dynamic.strokeCircle(x, y, 8 + progress * 10);
       this.dynamic.fillStyle(palette.pod, 0.9);
-      this.dynamic.fillCircle(x, y, 4);
+      this.dynamic.fillCircle(x, y, 3);
     }
 
     drawFx() {
@@ -680,11 +793,12 @@
     refreshHud(force) {
       const marked = this.state.targets.filter((target) => !target.alive).length;
       const total = this.state.targets.length;
-      const hud = `${marked}/${total}|${this.state.podsLeft}|${this.state.score}`;
+      const hud = `${this.state.stageIndex}|${marked}/${total}|${this.state.podsLeft}|${this.state.score}`;
       if (!force && hud === this.lastHud) {
         return;
       }
       this.lastHud = hud;
+      els.stage.textContent = `${this.state.stageIndex + 1}/${LEVELS.length}`;
       els.targets.textContent = `${marked}/${total}`;
       els.pods.textContent = `${this.state.podsLeft}`;
       els.score.textContent = `${this.state.score}`;
