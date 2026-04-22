@@ -133,7 +133,7 @@ input {
   right: 14px;
   bottom: 14px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(120px, 1fr)) auto auto;
+  grid-template-columns: repeat(3, minmax(120px, 1fr)) auto auto auto;
   gap: 10px;
   align-items: end;
   padding: 12px;
@@ -196,8 +196,80 @@ button svg {
   font-weight: 800;
 }
 
+.tool-button {
+  padding: 0 13px;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 700;
+}
+
 .icon-button {
   background: rgba(255, 255, 255, 0.08);
+}
+
+.bomb-panel {
+  right: 14px;
+  bottom: 86px;
+  display: grid;
+  width: min(430px, calc(100% - 28px));
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.bomb-panel[hidden] {
+  display: none;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-head strong {
+  font-size: 0.92rem;
+}
+
+.panel-head .icon-button {
+  width: 34px;
+  height: 34px;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.segmented:first-of-type {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.segment {
+  height: 34px;
+  min-width: 0;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.segment.is-active {
+  border-color: rgba(255, 204, 77, 0.7);
+  background: rgba(255, 204, 77, 0.18);
+  color: var(--ink);
+}
+
+.bomb-summary {
+  min-height: 30px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .message {
@@ -272,7 +344,7 @@ button svg {
   .controls {
     left: 10px;
     right: 10px;
-    grid-template-columns: minmax(0, 1fr) 54px;
+    grid-template-columns: minmax(0, 1fr) 54px 54px;
   }
 
   .control {
@@ -284,8 +356,37 @@ button svg {
     min-width: 0;
   }
 
-  .icon-button {
+  .tool-button {
     grid-column: 2;
     width: 54px;
+    padding: 0;
+  }
+
+  .tool-button .button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .icon-button {
+    grid-column: 3;
+    width: 54px;
+  }
+
+  .bomb-panel {
+    left: 21px;
+    right: 21px;
+    top: 82px;
+    bottom: auto;
+    width: auto;
+    max-height: 216px;
+    overflow: auto;
+  }
+
+  .bomb-panel .control {
+    grid-column: auto;
   }
 }

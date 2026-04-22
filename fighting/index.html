@@ -44,10 +44,61 @@
             <i data-lucide="send" aria-hidden="true"></i>
             <span>Drop</span>
           </button>
+          <button id="bomb-config-button" class="tool-button" type="button" title="Bomb setup">
+            <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+            <span class="button-label">Bomb</span>
+          </button>
           <button id="reset-button" class="icon-button" type="button" title="Reset">
             <i data-lucide="rotate-ccw" aria-hidden="true"></i>
             <span class="sr-only">Reset</span>
           </button>
+        </section>
+
+        <section id="bomb-panel" class="hud bomb-panel" aria-label="Bomb setup" hidden>
+          <header class="panel-head">
+            <strong>Bomb setup</strong>
+            <button id="bomb-close-button" class="icon-button" type="button" title="Close">
+              <i data-lucide="x" aria-hidden="true"></i>
+              <span class="sr-only">Close</span>
+            </button>
+          </header>
+
+          <div class="segmented" role="group" aria-label="Apply setup">
+            <button id="scope-all-button" class="segment is-active" type="button" data-scope="all">All pods</button>
+            <button id="scope-next-button" class="segment" type="button" data-scope="next">Next pod</button>
+          </div>
+
+          <div class="segmented" role="group" aria-label="Bomb type">
+            <button class="segment is-active" type="button" data-bomb-type="drill">Drill</button>
+            <button class="segment" type="button" data-bomb-type="bounce">Bounce</button>
+            <button class="segment" type="button" data-bomb-type="timer">Timer</button>
+          </div>
+
+          <label class="control">
+            <span>Explode delay</span>
+            <input id="fuse-input" type="range" min="0.35" max="3" step="0.05" value="1.35" />
+            <output id="fuse-output">1.35 s</output>
+          </label>
+
+          <label class="control">
+            <span>Blast radius</span>
+            <input id="blast-input" type="range" min="24" max="62" step="2" value="42" />
+            <output id="blast-output">42</output>
+          </label>
+
+          <label class="control">
+            <span>Drill walls</span>
+            <input id="drill-walls-input" type="range" min="1" max="7" step="1" value="3" />
+            <output id="drill-walls-output">3</output>
+          </label>
+
+          <label class="control">
+            <span>Bounces</span>
+            <input id="bounce-count-input" type="range" min="1" max="3" step="1" value="1" />
+            <output id="bounce-count-output">1</output>
+          </label>
+
+          <div id="bomb-summary" class="bomb-summary">All pods: drill, 3 walls, 1.35 s</div>
         </section>
 
         <div id="message" class="message" aria-live="polite"></div>
@@ -56,6 +107,6 @@
 
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-    <script src="./src/game.js?v=stage-accuracy-2"></script>
+    <script src="./src/game.js?v=bomb-setup-1"></script>
   </body>
 </html>

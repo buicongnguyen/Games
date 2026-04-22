@@ -19,6 +19,20 @@
     delayOut: document.getElementById("delay-output"),
     drop: document.getElementById("drop-button"),
     reset: document.getElementById("reset-button"),
+    bombConfig: document.getElementById("bomb-config-button"),
+    bombPanel: document.getElementById("bomb-panel"),
+    bombClose: document.getElementById("bomb-close-button"),
+    bombSummary: document.getElementById("bomb-summary"),
+    scopeButtons: Array.from(document.querySelectorAll("[data-scope]")),
+    typeButtons: Array.from(document.querySelectorAll("[data-bomb-type]")),
+    fuse: document.getElementById("fuse-input"),
+    fuseOut: document.getElementById("fuse-output"),
+    blast: document.getElementById("blast-input"),
+    blastOut: document.getElementById("blast-output"),
+    drillWalls: document.getElementById("drill-walls-input"),
+    drillWallsOut: document.getElementById("drill-walls-output"),
+    bounceCount: document.getElementById("bounce-count-input"),
+    bounceCountOut: document.getElementById("bounce-count-output"),
     stage: document.getElementById("stage-value"),
     targets: document.getElementById("targets-value"),
     pods: document.getElementById("pods-value"),
@@ -40,7 +54,33 @@
     targetDone: 0x5ee3a2,
     pod: 0xffcc4d,
     smoke: 0xf4f7f9,
+    blast: 0xff9c4a,
+    shock: 0xfff1a8,
   };
+
+  const DEFAULT_BOMB_CONFIG = {
+    type: "drill",
+    fuse: 1.35,
+    blastRadius: 42,
+    drillWalls: 3,
+    bounceCount: 1,
+  };
+
+  const BOMB_LABELS = {
+    drill: "Drill",
+    bounce: "Bounce",
+    timer: "Timer",
+  };
+
+  function cloneBombConfig(config) {
+    return {
+      type: config.type,
+      fuse: config.fuse,
+      blastRadius: config.blastRadius,
+      drillWalls: config.drillWalls,
+      bounceCount: config.bounceCount,
+    };
+  }
 
   const LEVELS = [
     {
@@ -145,6 +185,7 @@
       activePods: [],
       pendingDrop: null,
       fx: [],
+      blastRings: [],
       finished: false,
       advanceAt: 0,
       messageUntil: 0,
@@ -231,6 +272,9 @@
       super("SkyDrillScene");
       this.state = makeLevel(0, 0);
       this.plane = { x: -90, y: 78, speed: this.state.level.planeSpeed, banking: 0 };
+      this.bombScope = "all";
+      this.globalBombConfig = cloneBombConfig(DEFAULT_BOMB_CONFIG);
+      this.nextBombConfig = null;
       this.elapsed = 0;
       this.lastHud = "";
     }
@@ -262,10 +306,106 @@
 
       els.drop.addEventListener("click", () => this.queueDrop());
       els.reset.addEventListener("click", () => this.resetLevel());
+      els.bombConfig.addEventListener("click", () => this.toggleBombPanel());
+      els.bombClose.addEventListener("click", () => this.toggleBombPanel(false));
+
+      els.scopeButtons.forEach((button) => {
+        button.addEventListener("click", () => this.setBombScope(button.dataset.scope));
+      });
+
+      els.typeButtons.forEach((button) => {
+        button.addEventListener("click", () => this.setBombType(button.dataset.bombType));
+      });
+
+      [els.fuse, els.blast, els.drillWalls, els.bounceCount].forEach((input) => {
+        ["input", "change"].forEach((eventName) => {
+          input.addEventListener(eventName, () => this.applyBombInputs());
+        });
+      });
 
       this.input.keyboard.on("keydown-SPACE", () => this.queueDrop());
       this.input.keyboard.on("keydown-R", () => this.resetLevel());
       updateReadouts();
+      this.syncBombUi(this.getEditableBombConfig());
+    }
+
+    getEditableBombConfig() {
+      if (this.bombScope === "next") {
+        if (!this.nextBombConfig) {
+          this.nextBombConfig = cloneBombConfig(this.globalBombConfig);
+        }
+        return this.nextBombConfig;
+      }
+      return this.globalBombConfig;
+    }
+
+    getShotBombConfig() {
+      if (this.bombScope === "next" && this.nextBombConfig) {
+        const config = cloneBombConfig(this.nextBombConfig);
+        this.nextBombConfig = null;
+        if (this.bombScope === "next") {
+          this.syncBombUi(this.globalBombConfig);
+        }
+        return config;
+      }
+      return cloneBombConfig(this.globalBombConfig);
+    }
+
+    toggleBombPanel(forceOpen) {
+      const open = typeof forceOpen === "boolean" ? forceOpen : els.bombPanel.hidden;
+      els.bombPanel.hidden = !open;
+    }
+
+    setBombScope(scope) {
+      this.bombScope = scope === "next" ? "next" : "all";
+      if (this.bombScope === "all") {
+        this.nextBombConfig = null;
+      }
+      els.scopeButtons.forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.scope === this.bombScope);
+      });
+      this.syncBombUi(this.getEditableBombConfig());
+    }
+
+    setBombType(type) {
+      const config = this.getEditableBombConfig();
+      config.type = BOMB_LABELS[type] ? type : "drill";
+      this.syncBombUi(config);
+    }
+
+    applyBombInputs() {
+      const config = this.getEditableBombConfig();
+      config.fuse = Number(els.fuse.value);
+      config.blastRadius = Number(els.blast.value);
+      config.drillWalls = Number(els.drillWalls.value);
+      config.bounceCount = Number(els.bounceCount.value);
+      this.syncBombUi(config);
+    }
+
+    syncBombUi(config) {
+      els.fuse.value = `${config.fuse}`;
+      els.blast.value = `${config.blastRadius}`;
+      els.drillWalls.value = `${config.drillWalls}`;
+      els.bounceCount.value = `${config.bounceCount}`;
+      els.fuseOut.textContent = `${config.fuse.toFixed(2)} s`;
+      els.blastOut.textContent = `${config.blastRadius}`;
+      els.drillWallsOut.textContent = `${config.drillWalls}`;
+      els.bounceCountOut.textContent = `${config.bounceCount}`;
+      els.typeButtons.forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.bombType === config.type);
+      });
+      els.scopeButtons.forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.scope === this.bombScope);
+      });
+      const scope = this.bombScope === "next" ? "Next pod" : "All pods";
+      const type = BOMB_LABELS[config.type];
+      const detail =
+        config.type === "bounce"
+          ? `${config.bounceCount} bounce${config.bounceCount === 1 ? "" : "s"}`
+          : config.type === "drill"
+            ? `${config.drillWalls} wall${config.drillWalls === 1 ? "" : "s"}`
+            : `${config.fuse.toFixed(2)} s`;
+      els.bombSummary.textContent = `${scope}: ${type}, ${detail}, blast ${config.blastRadius}`;
     }
 
     resetLevel() {
@@ -309,6 +449,7 @@
       const speed = Number(els.speed.value);
       const radians = Phaser.Math.DegToRad(angleDeg);
       const level = this.state.level;
+      const bombConfig = this.getShotBombConfig();
       const pod = {
         x: this.plane.x,
         y: this.plane.y + 18,
@@ -319,6 +460,11 @@
         radius: level.podRadius,
         drillRadius: level.drillRadius,
         energy: speed * 0.76,
+        config: bombConfig,
+        fuseLeft: bombConfig.fuse,
+        piercedWalls: 0,
+        bounces: 0,
+        groundCooldown: 0,
         dead: false,
         age: 0,
         trail: [],
@@ -378,6 +524,8 @@
         pod.prevX = pod.x;
         pod.prevY = pod.y;
         pod.age += dt;
+        pod.fuseLeft -= dt;
+        pod.groundCooldown = Math.max(0, pod.groundCooldown - dt);
         pod.vy += GRAVITY * dt;
         pod.x += pod.vx * dt;
         pod.y += pod.vy * dt;
@@ -387,19 +535,37 @@
           pod.trail.shift();
         }
 
-        const touched = this.sampleDamage(pod, dt);
-        if (touched) {
+        const contact = this.sampleDamage(pod, dt);
+        if (pod.dead) {
+          continue;
+        }
+
+        if (contact.touched) {
           pod.energy -= (Number(els.speed.value) * 0.64 + 190) * dt;
           this.state.cameraKick = Math.min(1, this.state.cameraKick + 0.08);
         } else {
           pod.energy -= 22 * dt;
         }
 
+        if (pod.config.type === "drill" && pod.piercedWalls >= pod.config.drillWalls) {
+          this.explodePod(pod, "drill");
+          continue;
+        }
+
+        if (pod.fuseLeft <= 0) {
+          this.explodePod(pod, "fuse");
+          continue;
+        }
+
         this.checkTargets(pod);
 
         if (pod.y > MAP.y + MAP.height + 55 || pod.x < -80 || pod.x > WORLD.width + 80 || pod.energy <= 0) {
-          pod.dead = true;
-          this.makeBurst(pod.x, pod.y, pod.energy <= 0 ? palette.pod : palette.smoke, 7, 0.62);
+          if (pod.energy <= 0 && pod.x > MAP.x && pod.x < MAP.x + MAP.width) {
+            this.explodePod(pod, "energy");
+          } else {
+            pod.dead = true;
+            this.makeBurst(pod.x, pod.y, pod.energy <= 0 ? palette.pod : palette.smoke, 7, 0.62);
+          }
         }
       }
 
@@ -425,56 +591,93 @@
       const dy = pod.y - pod.prevY;
       const dist = Math.max(1, Math.hypot(dx, dy));
       const steps = Math.ceil(dist / 7);
-      let touched = false;
+      const contact = { touched: false, destroyed: 0 };
 
       for (let i = 0; i <= steps; i += 1) {
         const t = i / steps;
         const x = pod.prevX + dx * t;
         const y = pod.prevY + dy * t;
-        if (this.damageAt(x, y, pod.drillRadius, dt)) {
-          touched = true;
+        const hit = this.damageAt(x, y, pod.drillRadius, dt, "drill");
+        if (hit.touched) {
+          contact.touched = true;
+          contact.destroyed += hit.destroyed;
+          pod.piercedWalls += hit.destroyed;
         }
         if (y > SURFACE_Y + 12 && x > MAP.x && x < MAP.x + MAP.width) {
-          touched = true;
-          pod.energy -= 20 * dt;
-          this.chipGround(x, y);
+          contact.touched = true;
+          this.handleLandContact(pod, x, y, dt);
+          if (pod.dead) {
+            break;
+          }
         }
       }
 
-      return touched;
+      return contact;
     }
 
-    damageAt(x, y, radius, dt) {
-      let touched = false;
+    damageAt(x, y, radius, dt, source) {
+      const contact = { touched: false, destroyed: 0 };
       for (const building of this.state.buildings) {
         for (const block of building.blocks) {
           if (block.destroyed) {
             continue;
           }
           if (circleRectIntersects(x, y, radius, block)) {
-            touched = true;
-            const damage = 180 * dt + radius * 0.9;
+            contact.touched = true;
+            const damage = source === "blast" ? dt : 180 * dt + radius * 0.9;
             block.health -= damage;
-            this.state.fx.push({
-              x: x + Phaser.Math.Between(-5, 5),
-              y: y + Phaser.Math.Between(-5, 5),
-              vx: Phaser.Math.Between(-18, 18),
-              vy: Phaser.Math.Between(-30, 8),
-              life: 0.34,
-              maxLife: 0.34,
-              size: Phaser.Math.Between(2, 4),
-              color: palette.blockCrack,
-            });
+            if (source !== "blast") {
+              this.state.fx.push({
+                x: x + Phaser.Math.Between(-5, 5),
+                y: y + Phaser.Math.Between(-5, 5),
+                vx: Phaser.Math.Between(-18, 18),
+                vy: Phaser.Math.Between(-30, 8),
+                life: 0.34,
+                maxLife: 0.34,
+                size: Phaser.Math.Between(2, 4),
+                color: palette.blockCrack,
+              });
+            }
 
             if (block.health <= 0) {
               block.destroyed = true;
+              contact.destroyed += 1;
               this.state.score += 4;
               this.makeBurst(block.x + block.width / 2, block.y + block.height / 2, palette.buildingDark, 5, 0.58);
             }
           }
         }
       }
-      return touched;
+      return contact;
+    }
+
+    handleLandContact(pod, x, y, dt) {
+      this.chipGround(x, y);
+
+      if (pod.config.type === "bounce") {
+        if (pod.groundCooldown > 0) {
+          return;
+        }
+
+        pod.x = x;
+        pod.y = SURFACE_Y - pod.radius - 2;
+        pod.vx *= 0.72;
+        pod.vy = -Math.abs(pod.vy) * (0.34 + pod.bounces * 0.07);
+        pod.bounces += 1;
+        pod.groundCooldown = 0.18;
+
+        if (pod.bounces >= pod.config.bounceCount) {
+          pod.fuseLeft = Math.min(pod.fuseLeft, 0.26);
+          this.makeBurst(x, SURFACE_Y + 8, palette.pod, 5, 0.42);
+        }
+        return;
+      }
+
+      if (pod.config.type === "timer") {
+        pod.fuseLeft = Math.min(pod.fuseLeft, 0.12);
+      }
+
+      pod.energy -= pod.config.type === "drill" ? 18 * dt : 36 * dt;
     }
 
     chipGround(x, y) {
@@ -519,6 +722,88 @@
       }
     }
 
+    explodePod(pod, reason) {
+      if (pod.dead) {
+        return;
+      }
+
+      pod.dead = true;
+      const radius = pod.config.blastRadius;
+      const x = clamp(pod.x, MAP.x, MAP.x + MAP.width);
+      const y = clamp(pod.y, MAP.y, MAP.y + MAP.height + 18);
+      const hits = this.applyBlast(x, y, radius);
+
+      this.state.blastRings.push({
+        x,
+        y,
+        radius,
+        life: 0.34,
+        maxLife: 0.34,
+      });
+      this.makeBurst(x, y, palette.blast, 18, 0.86);
+      this.makeBurst(x, y, palette.shock, 10, 0.55);
+      this.state.cameraKick = Math.min(1.6, this.state.cameraKick + 0.45);
+
+      if (!this.state.finished && hits.targets > 0) {
+        this.showMessage(`${BOMB_LABELS[pod.config.type]} blast marked target`);
+      } else if (reason === "drill") {
+        this.showMessage("Drill depth reached");
+      }
+    }
+
+    applyBlast(x, y, radius) {
+      const hits = { blocks: 0, targets: 0 };
+
+      for (const building of this.state.buildings) {
+        for (const block of building.blocks) {
+          if (block.destroyed || !circleRectIntersects(x, y, radius, block)) {
+            continue;
+          }
+
+          const cx = block.x + block.width / 2;
+          const cy = block.y + block.height / 2;
+          const distance = Math.hypot(cx - x, cy - y);
+          const falloff = clamp(1 - distance / radius, 0.18, 1);
+          block.health -= 58 + radius * 0.9 * falloff;
+
+          if (block.health <= 0) {
+            block.destroyed = true;
+            hits.blocks += 1;
+            this.state.score += 6;
+            this.makeBurst(cx, cy, palette.buildingDark, 4, 0.42);
+          }
+        }
+      }
+
+      for (const target of this.state.targets) {
+        if (!target.alive) {
+          continue;
+        }
+
+        const tx = target.x;
+        const ty = target.y - 8 * target.scale;
+        if (Math.hypot(tx - x, ty - y) <= radius * 0.72 + target.hitRadius) {
+          target.alive = false;
+          hits.targets += 1;
+          this.state.score += 120;
+          this.makeBurst(target.x, target.y - 14 * target.scale, palette.targetDone, 10, 0.58);
+        }
+      }
+
+      if (!this.state.finished && this.state.targets.every((target) => !target.alive)) {
+        this.state.finished = true;
+        this.state.score += this.state.podsLeft * this.state.level.bonusPerPod;
+        if (this.state.stageIndex < LEVELS.length - 1) {
+          this.state.advanceAt = this.elapsed + 1.65;
+          this.showMessage(`${this.state.level.name} clear`);
+        } else {
+          this.showMessage("All stages clear");
+        }
+      }
+
+      return hits;
+    }
+
     makeBurst(x, y, color, count, sizeScale) {
       const scale = sizeScale || 1;
       for (let i = 0; i < count; i += 1) {
@@ -545,6 +830,10 @@
         particle.vy += 110 * dt;
       }
       this.state.fx = this.state.fx.filter((particle) => particle.life > 0);
+      for (const ring of this.state.blastRings) {
+        ring.life -= dt;
+      }
+      this.state.blastRings = this.state.blastRings.filter((ring) => ring.life > 0);
 
       if (this.state.cameraKick > 0) {
         this.state.cameraKick = Math.max(0, this.state.cameraKick - dt * 2.8);
@@ -770,6 +1059,14 @@
     }
 
     drawFx() {
+      for (const ring of this.state.blastRings) {
+        const progress = 1 - ring.life / ring.maxLife;
+        const alpha = clamp(ring.life / ring.maxLife, 0, 1);
+        this.fx.lineStyle(2, palette.shock, alpha * 0.75);
+        this.fx.strokeCircle(ring.x, ring.y, ring.radius * (0.45 + progress * 0.55));
+        this.fx.fillStyle(palette.blast, alpha * 0.12);
+        this.fx.fillCircle(ring.x, ring.y, ring.radius * (0.32 + progress * 0.5));
+      }
       for (const particle of this.state.fx) {
         const alpha = clamp(particle.life / particle.maxLife, 0, 1);
         this.fx.fillStyle(particle.color, alpha);
