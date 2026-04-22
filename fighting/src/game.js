@@ -42,6 +42,7 @@
     pods: document.getElementById("pods-value"),
     scoreLabel: document.getElementById("score-label"),
     score: document.getElementById("score-value"),
+    skip: document.getElementById("skip-button"),
     message: document.getElementById("message"),
   };
 
@@ -356,6 +357,7 @@
 
       els.drop.addEventListener("click", () => this.queueDrop());
       els.reset.addEventListener("click", () => this.resetCurrentLevel());
+      els.skip.addEventListener("click", () => this.skipCurrentLevel());
       els.bombConfig.addEventListener("click", () => this.toggleBombPanel());
       els.bombClose.addEventListener("click", () => this.toggleBombPanel(false));
 
@@ -379,6 +381,7 @@
         }
       });
       this.input.keyboard.on("keydown-R", () => this.resetCurrentLevel());
+      this.input.keyboard.on("keydown-N", () => this.skipCurrentLevel());
       this.input.keyboard.on("keydown-ONE", () => this.setHeliWeapon("gun"));
       this.input.keyboard.on("keydown-TWO", () => this.setHeliWeapon("missile"));
       updateReadouts();
@@ -417,6 +420,34 @@
       } else {
         this.loadBombingLevel(this.bombing.levelIndex, this.bombing.levelStartScore, `${this.bombing.level.name} reset`);
       }
+    }
+
+    skipCurrentLevel() {
+      if (this.mode === "ship") {
+        const next = this.ship.levelIndex + 1;
+        if (next < SHIP_LEVELS.length) {
+          this.loadShipLevel(next, this.score, `Skipped to ${SHIP_LEVELS[next].name}`);
+        } else {
+          this.loadHeliLevel(0, this.score, "Skipped to Chapter 3");
+        }
+      } else if (this.mode === "heli") {
+        const next = this.heli.levelIndex + 1;
+        if (next < HELI_LEVELS.length) {
+          this.loadHeliLevel(next, this.score, `Skipped to ${HELI_LEVELS[next].name}`);
+        } else {
+          this.heli.finished = true;
+          this.showMessage("Campaign complete");
+        }
+      } else {
+        const next = this.bombing.levelIndex + 1;
+        const score = this.bombing.score;
+        if (next < CHAPTER1_LEVELS.length) {
+          this.loadBombingLevel(next, score, `Skipped to ${CHAPTER1_LEVELS[next].name}`);
+        } else {
+          this.loadShipLevel(0, score, "Skipped to Chapter 2");
+        }
+      }
+      this.refreshHud(true);
     }
 
     showBombingControls(visible) {

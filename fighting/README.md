@@ -8,4 +8,6 @@ Chapter 2 switches to a canal survival level where the ship stays near the middl
 
 Chapter 3 switches to helicopter defense over a mountain river. Click holes, stick figures, launchers, or incoming missiles; press `1` for gun and `2` for missile.
 
+Use the `Skip` button, or press `N`, to jump to the next level while testing later chapters.
+
 Open `index.html` in a browser, or serve the folder with a local static server.
