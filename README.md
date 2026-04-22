@@ -27,6 +27,7 @@ A classic Tetris game implemented using HTML5 Canvas and vanilla JavaScript with
 - Line clearing mechanics (1, 2, 3, or 4 lines at once)
 - Game over detection with restart option
 - Mobile touch controls with a draggable control panel
+- Generated neon arcade background art for the game shell
 - Modern, sleek UI with gradient backgrounds and glass-morphism effects
 - Responsive design that works on different screen sizes
 
@@ -44,6 +45,7 @@ Every 10 lines cleared increases the level by 1, making the game progressively f
 - `index.html`: Main HTML structure
 - `style.css`: Styling for the game interface
 - `script.js`: Game logic implementation
+- `assets/neon-blocks-background.png`: Generated arcade background art
 - `README.md`: This file
 
 Enjoy the game!
