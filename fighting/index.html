@@ -16,16 +16,22 @@
             <span class="brand-mark" aria-hidden="true"></span>
             <span>Sky Drill</span>
           </div>
-          <div class="stats">
-            <span><span id="stage-label">Level</span> <strong id="stage-value">1/6</strong></span>
-            <span><span id="targets-label">Targets</span> <strong id="targets-value">0/0</strong></span>
-            <span><span id="pods-label">Pods</span> <strong id="pods-value">0</strong></span>
-            <span><span id="score-label">Score</span> <strong id="score-value">0</strong></span>
-          </div>
-          <button id="skip-button" class="skip-button" type="button" title="Skip level">
-            <i data-lucide="skip-forward" aria-hidden="true"></i>
-            <span>Skip</span>
+          <button id="status-toggle-button" class="icon-button status-toggle" type="button" title="Game menu" aria-expanded="false" aria-controls="status-panel">
+            <i data-lucide="settings" aria-hidden="true"></i>
+            <span class="sr-only">Game menu</span>
           </button>
+          <div id="status-panel" class="status-panel" hidden>
+            <div class="stats">
+              <span><span id="stage-label">Level</span> <strong id="stage-value">1/6</strong></span>
+              <span><span id="targets-label">Targets</span> <strong id="targets-value">0/0</strong></span>
+              <span><span id="pods-label">Pods</span> <strong id="pods-value">0</strong></span>
+              <span><span id="score-label">Score</span> <strong id="score-value">0</strong></span>
+            </div>
+            <button id="skip-button" class="skip-button" type="button" title="Skip level">
+              <i data-lucide="skip-forward" aria-hidden="true"></i>
+              <span>Skip</span>
+            </button>
+          </div>
         </header>
 
         <section id="drop-controls" class="hud controls" aria-label="Drop controls">
@@ -105,12 +111,23 @@
           <div id="bomb-summary" class="bomb-summary">All pods: drill, 3 walls, 1.35 s</div>
         </section>
 
+        <div id="touch-controls" class="touch-controls" hidden>
+          <div id="move-pad" class="touch-pad move-pad" role="application" aria-label="Move control">
+            <span class="pad-cross" aria-hidden="true"></span>
+            <span id="move-pad-knob" class="pad-knob" aria-hidden="true"></span>
+          </div>
+          <div id="fire-pad" class="touch-pad fire-pad" role="application" aria-label="Fire direction control">
+            <span class="pad-cross" aria-hidden="true"></span>
+            <span id="fire-pad-knob" class="pad-knob" aria-hidden="true"></span>
+          </div>
+        </div>
+
         <div id="message" class="message" aria-live="polite"></div>
       </section>
     </main>
 
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-    <script src="./src/game.js?v=chapter-motion-2"></script>
+    <script src="./src/game.js?v=touch-controls-1"></script>
   </body>
 </html>

@@ -43,6 +43,13 @@
     scoreLabel: document.getElementById("score-label"),
     score: document.getElementById("score-value"),
     skip: document.getElementById("skip-button"),
+    statusToggle: document.getElementById("status-toggle-button"),
+    statusPanel: document.getElementById("status-panel"),
+    touchControls: document.getElementById("touch-controls"),
+    movePad: document.getElementById("move-pad"),
+    movePadKnob: document.getElementById("move-pad-knob"),
+    firePad: document.getElementById("fire-pad"),
+    firePadKnob: document.getElementById("fire-pad-knob"),
     message: document.getElementById("message"),
   };
 
@@ -187,8 +194,10 @@
   ];
 
   const SHIP_CENTER = { x: WORLD.width / 2, y: 316 };
-  const SHIP_LIMITS = { left: 278, right: 682, top: 148, bottom: 458 };
+  const SHIP_LIMITS = { left: 242, right: 718, top: 148, bottom: 458 };
   const SHIP_MOVE_SPEED = 218;
+  const SHIP_FIRE_RATE = 0.18;
+  const SHIP_BULLET_SPEED = 780;
 
   const HELI_LEVELS = [
     { name: "Chapter 3-1", duration: 42, holes: 8, missileRate: 2.8 },
@@ -196,9 +205,10 @@
     { name: "Chapter 3-3", duration: 58, holes: 12, missileRate: 1.85 },
   ];
 
-  const HELI_BASE = { x: WORLD.width / 2, y: 468 };
-  const HELI_LIMITS = { left: 292, right: 668 };
+  const HELI_BASE = { x: WORLD.width / 2, y: 462 };
+  const HELI_LIMITS = { left: 268, right: 692, top: 350, bottom: 500 };
   const HELI_MOVE_SPEED = 236;
+  const HELI_FIRE_RATE = 0.18;
 
   function cloneBombConfig(config) {
     return {
@@ -222,19 +232,42 @@
     return dx * dx + dy * dy <= radius * radius;
   }
 
+  function pointSegmentDistance(px, py, ax, ay, bx, by) {
+    const vx = bx - ax;
+    const vy = by - ay;
+    const lenSq = vx * vx + vy * vy || 1;
+    const t = clamp(((px - ax) * vx + (py - ay) * vy) / lenSq, 0, 1);
+    const x = ax + vx * t;
+    const y = ay + vy * t;
+    return Math.hypot(px - x, py - y);
+  }
+
+  function turnToward(current, target, maxTurn) {
+    let delta = target - current;
+    while (delta > Math.PI) {
+      delta -= Math.PI * 2;
+    }
+    while (delta < -Math.PI) {
+      delta += Math.PI * 2;
+    }
+    return current + clamp(delta, -maxTurn, maxTurn);
+  }
+
   function createBuilding(id, x, y, width, height, cols, rows, healthScale) {
     const blocks = [];
     const bw = width / cols;
     const bh = height / rows;
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < cols; col += 1) {
-        const health = (row === rows - 1 ? 62 : 43) * healthScale;
+        const health = (row === rows - 1 ? 86 : 43) * healthScale;
         blocks.push({
           id: `${id}-${col}-${row}`,
           x: x + col * bw,
           y: y + row * bh,
           width: bw,
           height: bh,
+          row,
+          rows,
           health,
           maxHealth: health,
           destroyed: false,
@@ -331,6 +364,8 @@
       this.bombScope = "all";
       this.globalBombConfig = cloneBombConfig(DEFAULT_BOMB_CONFIG);
       this.nextBombConfig = null;
+      this.movePad = { x: 0, y: 0, active: false };
+      this.firePad = { x: 0, y: -1, active: false };
       this.elapsed = 0;
       this.lastHud = "";
     }
@@ -356,8 +391,8 @@
         image.setVisible(false);
       });
       this.shipBankScrolls = {
-        left: this.add.tileSprite(0, 0, 336, WORLD.height, "bg-ship-bank-left"),
-        right: this.add.tileSprite(WORLD.width - 336, 0, 336, WORLD.height, "bg-ship-bank-right"),
+        left: this.add.tileSprite(0, 0, 300, WORLD.height, "bg-ship-bank-left"),
+        right: this.add.tileSprite(WORLD.width - 300, 0, 300, WORLD.height, "bg-ship-bank-right"),
       };
       Object.values(this.shipBankScrolls).forEach((image) => {
         image.setOrigin(0, 0);
@@ -408,7 +443,11 @@
 
       els.drop.addEventListener("click", () => this.queueDrop());
       els.reset.addEventListener("click", () => this.resetCurrentLevel());
-      els.skip.addEventListener("click", () => this.skipCurrentLevel());
+      els.skip.addEventListener("click", () => {
+        this.toggleStatusPanel(false);
+        this.skipCurrentLevel();
+      });
+      els.statusToggle.addEventListener("click", () => this.toggleStatusPanel());
       els.bombConfig.addEventListener("click", () => this.toggleBombPanel());
       els.bombClose.addEventListener("click", () => this.toggleBombPanel(false));
 
@@ -427,6 +466,8 @@
       this.input.keyboard.on("keydown-SPACE", () => {
         if (this.mode === "bombing") {
           this.queueDrop();
+        } else if (this.mode === "ship") {
+          this.fireShipGun({ x: 0, y: -1 });
         } else if (this.mode === "heli") {
           this.fireHeliWeapon(WORLD.width / 2, WORLD.height / 2);
         }
@@ -435,8 +476,60 @@
       this.input.keyboard.on("keydown-N", () => this.skipCurrentLevel());
       this.input.keyboard.on("keydown-ONE", () => this.setHeliWeapon("gun"));
       this.input.keyboard.on("keydown-TWO", () => this.setHeliWeapon("missile"));
+      this.bindTouchPad(els.movePad, els.movePadKnob, this.movePad, false);
+      this.bindTouchPad(els.firePad, els.firePadKnob, this.firePad, true);
       updateReadouts();
       this.syncBombUi(this.getEditableBombConfig());
+    }
+
+    toggleStatusPanel(force) {
+      const open = typeof force === "boolean" ? force : els.statusPanel.hidden;
+      els.statusPanel.hidden = !open;
+      els.statusToggle.setAttribute("aria-expanded", String(open));
+    }
+
+    bindTouchPad(pad, knob, state, keepDirection) {
+      const resetKnob = () => {
+        knob.style.transform = "translate(-50%, -50%)";
+      };
+      const setFromEvent = (event) => {
+        const rect = pad.getBoundingClientRect();
+        const radius = Math.max(1, Math.min(rect.width, rect.height) / 2);
+        const rawX = event.clientX - (rect.left + rect.width / 2);
+        const rawY = event.clientY - (rect.top + rect.height / 2);
+        const distance = Math.hypot(rawX, rawY);
+        const scale = distance > radius ? radius / distance : 1;
+        const x = rawX * scale;
+        const y = rawY * scale;
+        state.x = distance < 6 && keepDirection ? state.x || 0 : x / radius;
+        state.y = distance < 6 && keepDirection ? state.y || -1 : y / radius;
+        state.active = true;
+        knob.style.transform = `translate(calc(-50% + ${x * 0.72}px), calc(-50% + ${y * 0.72}px))`;
+      };
+      pad.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        pad.setPointerCapture(event.pointerId);
+        setFromEvent(event);
+      });
+      pad.addEventListener("pointermove", (event) => {
+        if (pad.hasPointerCapture(event.pointerId)) {
+          event.preventDefault();
+          setFromEvent(event);
+        }
+      });
+      const release = (event) => {
+        if (pad.hasPointerCapture(event.pointerId)) {
+          pad.releasePointerCapture(event.pointerId);
+        }
+        state.active = false;
+        if (!keepDirection) {
+          state.x = 0;
+          state.y = 0;
+          resetKnob();
+        }
+      };
+      pad.addEventListener("pointerup", release);
+      pad.addEventListener("pointercancel", release);
     }
 
     update(time, delta) {
@@ -504,8 +597,22 @@
     showBombingControls(visible) {
       els.controls.hidden = !visible;
       document.querySelector(".stage").classList.toggle("is-full-game", !visible);
+      this.setTouchControlsMode(visible ? null : this.mode);
       if (!visible) {
         els.bombPanel.hidden = true;
+      }
+    }
+
+    setTouchControlsMode(mode) {
+      const active = mode === "ship" || mode === "heli";
+      els.touchControls.hidden = !active;
+      els.touchControls.classList.toggle("is-ship", mode === "ship");
+      els.touchControls.classList.toggle("is-heli", mode === "heli");
+      if (!active) {
+        this.movePad.x = 0;
+        this.movePad.y = 0;
+        this.movePad.active = false;
+        this.firePad.active = false;
       }
     }
 
@@ -944,6 +1051,10 @@
       if (this.chapterBackgrounds) {
         this.bg.fillStyle(0x041018, 0.08);
         this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
+        this.bg.fillStyle(0x365c36, 0.34);
+        this.bg.fillRoundedRect(MAP.x + 86, SURFACE_Y + 8, MAP.width - 172, 58, 10);
+        this.bg.fillStyle(0x1f3026, 0.24);
+        this.bg.fillRoundedRect(MAP.x + 116, SURFACE_Y + 36, MAP.width - 232, 28, 8);
         this.bg.lineStyle(3, 0xf4f7f9, 0.32);
         this.bg.strokeRoundedRect(MAP.x - 22, MAP.y - 18, MAP.width + 44, MAP.height + 40, 12);
         return;
@@ -1054,6 +1165,10 @@
           this.map.fillRect(block.x, block.y, block.width - 1.5, block.height - 1.5);
           this.map.lineStyle(1, 0xffffff, 0.12);
           this.map.strokeRect(block.x + 0.5, block.y + 0.5, block.width - 2.5, block.height - 2.5);
+          if (block.row === block.rows - 1) {
+            this.map.lineStyle(2, 0x141b20, 0.48);
+            this.map.strokeRect(block.x + 1, block.y + 1, block.width - 3, block.height - 3);
+          }
           if (block.height > 30) {
             this.map.fillStyle(0x365d72, 0.58);
             this.map.fillRect(block.x + block.width * 0.28, block.y + 9, block.width * 0.18, 12);
@@ -1169,9 +1284,11 @@
         shipY: 0,
         armor: 3,
         bullets: [],
+        playerBullets: [],
         mines: [],
         guns: [],
         fx: [],
+        fireCooldown: 0,
         failed: false,
         finished: false,
         messageUntil: 0,
@@ -1182,6 +1299,7 @@
           side,
           y: 118 + (i * 73) % 330,
           cooldown: Phaser.Math.FloatBetween(0.3, level.bulletRate),
+          alive: true,
         });
       }
       for (let i = 0; i < level.mines; i += 1) {
@@ -1193,7 +1311,7 @@
 
     createMine(y) {
       return {
-        x: WORLD.width / 2 + Phaser.Math.Between(-170, 170),
+        x: WORLD.width / 2 + Phaser.Math.Between(-196, 196),
         y,
         pulse: Math.random() * Math.PI * 2,
         exploded: false,
@@ -1211,8 +1329,8 @@
       const right = this.cursors.right.isDown || this.keys.D.isDown;
       const up = this.cursors.up.isDown || this.keys.W.isDown;
       const down = this.cursors.down.isDown || this.keys.S.isDown;
-      const moveX = (right ? 1 : 0) - (left ? 1 : 0);
-      const moveY = (down ? 1 : 0) - (up ? 1 : 0);
+      const moveX = (right ? 1 : 0) - (left ? 1 : 0) + this.movePad.x;
+      const moveY = (down ? 1 : 0) - (up ? 1 : 0) + this.movePad.y;
       if (moveX !== 0 || moveY !== 0) {
         const length = Math.hypot(moveX, moveY);
         state.shipX += (moveX / length) * SHIP_MOVE_SPEED * dt;
@@ -1221,12 +1339,20 @@
       state.shipX = clamp(state.shipX, SHIP_LIMITS.left - SHIP_CENTER.x, SHIP_LIMITS.right - SHIP_CENTER.x);
       state.shipY = clamp(state.shipY, SHIP_LIMITS.top - SHIP_CENTER.y, SHIP_LIMITS.bottom - SHIP_CENTER.y);
       const ship = this.shipPosition();
+      state.fireCooldown = Math.max(0, state.fireCooldown - dt);
+      if (this.firePad.active && state.fireCooldown <= 0) {
+        this.fireShipGun(this.firePad);
+      }
 
       for (const gun of state.guns) {
         gun.y += state.level.riverSpeed * dt;
         if (gun.y > WORLD.height + 46) {
           gun.y = -Phaser.Math.Between(45, 130);
           gun.cooldown = Phaser.Math.FloatBetween(0.25, state.level.bulletRate);
+          gun.alive = true;
+        }
+        if (!gun.alive) {
+          continue;
         }
         gun.cooldown -= dt;
         if (gun.y > 58 && gun.y < WORLD.height - 34 && gun.cooldown <= 0) {
@@ -1237,6 +1363,32 @@
           gun.cooldown = state.level.bulletRate + Phaser.Math.FloatBetween(-0.25, 0.35);
         }
       }
+
+      for (const bullet of state.playerBullets) {
+        bullet.prevX = bullet.x;
+        bullet.prevY = bullet.y;
+        bullet.x += bullet.vx * dt;
+        bullet.y += bullet.vy * dt;
+        bullet.life -= dt;
+        for (const gun of state.guns) {
+          if (!gun.alive) {
+            continue;
+          }
+          const gunX = gun.side < 0 ? 190 : 770;
+          if (pointSegmentDistance(gunX, gun.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < 42) {
+            gun.alive = false;
+            bullet.life = 0;
+            state.score += 40;
+            this.score = state.score;
+            this.shipHitFx(gunX, gun.y, palette.blast);
+            this.showMessage("Cannon disabled");
+            break;
+          }
+        }
+      }
+      state.playerBullets = state.playerBullets.filter(
+        (bullet) => bullet.life > 0 && bullet.x > -50 && bullet.x < WORLD.width + 50 && bullet.y > -50 && bullet.y < WORLD.height + 50
+      );
 
       for (const bullet of state.bullets) {
         bullet.x += bullet.vx * dt;
@@ -1295,6 +1447,26 @@
       return { x: SHIP_CENTER.x + this.ship.shipX, y: SHIP_CENTER.y + this.ship.shipY };
     }
 
+    fireShipGun(direction) {
+      if (!this.ship || this.ship.failed || this.ship.finished) {
+        return;
+      }
+      const ship = this.shipPosition();
+      const dx = direction && Math.abs(direction.x) + Math.abs(direction.y) > 0.08 ? direction.x : 0;
+      const dy = direction && Math.abs(direction.x) + Math.abs(direction.y) > 0.08 ? direction.y : -1;
+      const length = Math.hypot(dx, dy) || 1;
+      this.ship.playerBullets.push({
+        x: ship.x,
+        y: ship.y - 36,
+        prevX: ship.x,
+        prevY: ship.y - 36,
+        vx: (dx / length) * SHIP_BULLET_SPEED,
+        vy: (dy / length) * SHIP_BULLET_SPEED,
+        life: 1.45,
+      });
+      this.ship.fireCooldown = SHIP_FIRE_RATE;
+    }
+
     shipHitFx(x, y, color) {
       for (let i = 0; i < 12; i += 1) {
         const angle = Math.random() * Math.PI * 2;
@@ -1330,6 +1502,8 @@
       if (this.chapterBackgrounds) {
         this.bg.fillStyle(0x052230, 0.12);
         this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
+        this.bg.fillStyle(palette.river, 0.14);
+        this.bg.fillRoundedRect(292, -28, 376, WORLD.height + 56, 18);
       } else {
         this.bg.fillStyle(0x7fb7ce, 1);
         this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
@@ -1351,7 +1525,7 @@
       this.drawShipMotionLayer(state);
 
       for (const gun of state.guns) {
-        if (gun.y < -32 || gun.y > WORLD.height + 32) {
+        if (!gun.alive || gun.y < -32 || gun.y > WORLD.height + 32) {
           continue;
         }
         const x = gun.side < 0 ? 190 : 770;
@@ -1375,7 +1549,17 @@
         this.dynamic.fillCircle(bullet.x, bullet.y, 4);
       }
 
+      for (const bullet of state.playerBullets) {
+        this.dynamic.fillStyle(palette.shock, 1);
+        this.dynamic.fillCircle(bullet.x, bullet.y, 3.2);
+      }
+
       const ship = this.shipPosition();
+      if (this.firePad.active) {
+        const length = Math.hypot(this.firePad.x, this.firePad.y) || 1;
+        this.dynamic.lineStyle(2, palette.shock, 0.38);
+        this.dynamic.lineBetween(ship.x, ship.y - 36, ship.x + (this.firePad.x / length) * 82, ship.y - 36 + (this.firePad.y / length) * 82);
+      }
       this.dynamic.save();
       this.dynamic.translateCanvas(ship.x, ship.y);
       for (let layer = 0; layer < state.armor; layer += 1) {
@@ -1440,6 +1624,7 @@
         timeLeft: level.duration,
         armor: 3,
         heliX: 0,
+        heliY: 0,
         shields: [
           { id: "left", label: "Left", offsetX: -56, alive: true },
           { id: "center", label: "Center", offsetX: 0, alive: true },
@@ -1450,6 +1635,7 @@
         missiles: [],
         shots: [],
         fx: [],
+        fireCooldown: 0,
         failed: false,
         finished: false,
         messageUntil: 0,
@@ -1484,7 +1670,7 @@
     }
 
     heliPosition() {
-      return { x: HELI_BASE.x + this.heli.heliX, y: HELI_BASE.y };
+      return { x: HELI_BASE.x + this.heli.heliX, y: HELI_BASE.y + this.heli.heliY };
     }
 
     setHeliWeapon(weapon) {
@@ -1509,9 +1695,11 @@
       const isMissile = state.weapon === "missile";
       const radius = isMissile ? 56 : 18;
       const heli = this.heliPosition();
+      const fromX = heli.x;
+      const fromY = heli.y - 18;
       state.shots.push({
-        fromX: heli.x,
-        fromY: heli.y - 18,
+        fromX,
+        fromY,
         x,
         y,
         radius,
@@ -1521,7 +1709,10 @@
       });
 
       for (const missile of state.missiles) {
-        if (!missile.dead && Math.hypot(missile.x - x, missile.y - y) <= radius + missile.size * 0.5) {
+        const distance = isMissile
+          ? Math.hypot(missile.x - x, missile.y - y)
+          : pointSegmentDistance(missile.x, missile.y, fromX, fromY, x, y);
+        if (!missile.dead && distance <= radius + missile.size * 0.5) {
           missile.dead = true;
           state.score += 80;
           this.score = state.score;
@@ -1530,7 +1721,9 @@
       }
 
       for (const hole of state.holes) {
-        const distance = Math.hypot(hole.x - x, hole.y - y);
+        const distance = isMissile
+          ? Math.hypot(hole.x - x, hole.y - y)
+          : pointSegmentDistance(hole.x, hole.y, fromX, fromY, x, y);
         if (distance <= radius + hole.r * 0.5) {
           if (hole.state === "enemy") {
             state.score += 60;
@@ -1568,13 +1761,24 @@
       state.timeLeft -= dt;
       const left = this.cursors.left.isDown || this.keys.A.isDown;
       const right = this.cursors.right.isDown || this.keys.D.isDown;
-      if (left) {
-        state.heliX -= HELI_MOVE_SPEED * dt;
-      }
-      if (right) {
-        state.heliX += HELI_MOVE_SPEED * dt;
+      const up = this.cursors.up.isDown || this.keys.W.isDown;
+      const down = this.cursors.down.isDown || this.keys.S.isDown;
+      const moveX = (right ? 1 : 0) - (left ? 1 : 0) + this.movePad.x;
+      const moveY = (down ? 1 : 0) - (up ? 1 : 0) + this.movePad.y;
+      if (moveX !== 0 || moveY !== 0) {
+        const length = Math.hypot(moveX, moveY);
+        state.heliX += (moveX / length) * HELI_MOVE_SPEED * dt;
+        state.heliY += (moveY / length) * HELI_MOVE_SPEED * dt;
       }
       state.heliX = clamp(state.heliX, HELI_LIMITS.left - HELI_BASE.x, HELI_LIMITS.right - HELI_BASE.x);
+      state.heliY = clamp(state.heliY, HELI_LIMITS.top - HELI_BASE.y, HELI_LIMITS.bottom - HELI_BASE.y);
+      state.fireCooldown = Math.max(0, state.fireCooldown - dt);
+      if (this.firePad.active && state.fireCooldown <= 0) {
+        const heli = this.heliPosition();
+        const length = Math.hypot(this.firePad.x, this.firePad.y) || 1;
+        this.fireHeliWeapon(heli.x + (this.firePad.x / length) * 520, heli.y - 18 + (this.firePad.y / length) * 520);
+        state.fireCooldown = state.weapon === "missile" ? 0.46 : HELI_FIRE_RATE;
+      }
 
       for (const hole of state.holes) {
         hole.timer += dt;
@@ -1615,9 +1819,11 @@
         missile.life += dt;
         missile.speed += 7 * dt;
         missile.size = Math.min(18, missile.size + 2.4 * dt);
+        const heli = this.heliPosition();
+        const targetAngle = Math.atan2(heli.y - missile.y, heli.x - missile.x);
+        missile.angle = turnToward(missile.angle, targetAngle, 1.45 * dt);
         missile.x += Math.cos(missile.angle) * missile.speed * dt;
         missile.y += Math.sin(missile.angle) * missile.speed * dt;
-        const heli = this.heliPosition();
         const relX = missile.x - heli.x;
         const relY = missile.y - heli.y;
         const hitOval = (relX * relX) / (96 * 96) + (relY * relY) / (34 * 34) <= 1;
@@ -1800,7 +2006,7 @@
         hud = `ship|${this.ship.levelIndex}|${Math.ceil(this.ship.timeLeft)}|${this.ship.armor}|${this.score}`;
       } else if (this.mode === "heli") {
         const shields = this.heli.shields.map((shield) => (shield.alive ? "1" : "0")).join("");
-        hud = `heli|${this.heli.levelIndex}|${Math.ceil(this.heli.timeLeft)}|${this.heli.armor}|${this.heli.weapon}|${Math.round(this.heli.heliX)}|${shields}|${this.score}`;
+        hud = `heli|${this.heli.levelIndex}|${Math.ceil(this.heli.timeLeft)}|${this.heli.armor}|${this.heli.weapon}|${Math.round(this.heli.heliX)}|${Math.round(this.heli.heliY)}|${shields}|${this.score}`;
       } else {
         const marked = this.bombing.targets.filter((target) => !target.alive).length;
         hud = `bomb|${this.bombing.levelIndex}|${marked}/${this.bombing.targets.length}|${this.bombing.podsLeft}|${this.bombing.score}`;
