@@ -11,6 +11,7 @@ const COLORS = [
     '#FFE138', // T
     '#3877FF'  // Z
 ];
+const LINE_CLEAR_ANIMATION_DURATION = 520;
 
 // Tetromino shapes
 const SHAPES = [
@@ -47,6 +48,7 @@ let dropInterval = 1000;
 let nextPiece = null;
 let animationFrameId = null;
 let hasStarted = false;
+let lineClearAnimation = null;
 let player = {
     pos: {x: 0, y: 0},
     matrix: null,
@@ -346,6 +348,7 @@ function resetGame() {
     dropCounter = 0;
     lastFrameTime = 0;
     nextPiece = null;
+    lineClearAnimation = null;
 
     // Clear the board
     createBoard();
@@ -477,6 +480,8 @@ function draw() {
     if (player.matrix) {
         drawMatrix(player.matrix[0], player.pos, player.matrix[1]);
     }
+
+    drawLineClearAnimation();
 }
 
 // Create a cached grid image to avoid redrawing every frame
@@ -606,6 +611,10 @@ function merge() {
 
 // Move the player horizontally
 function playerMove(dir) {
+    if (lineClearAnimation) {
+        return;
+    }
+
     player.pos.x += dir;
     if (collide()) {
         player.pos.x -= dir;
@@ -614,6 +623,10 @@ function playerMove(dir) {
 
 // Rotate the player's piece
 function playerRotate(dir) {
+    if (lineClearAnimation) {
+        return;
+    }
+
     const pos = player.pos.x;
     let offset = 1;
     rotate(player.matrix[0], dir);
@@ -646,7 +659,14 @@ function rotate(matrix, dir) {
 
 function lockPiece() {
     merge();
-    sweep();
+    const completedRows = getCompletedRows();
+
+    if (completedRows.length > 0) {
+        startLineClearAnimation(completedRows);
+        updateControlButtons();
+        return;
+    }
+
     playerReset();
     updateScore();
     updateControlButtons();
@@ -654,6 +674,10 @@ function lockPiece() {
 
 // Drop the player's piece
 function playerDrop() {
+    if (lineClearAnimation) {
+        return;
+    }
+
     player.pos.y++;
     if (collide()) {
         player.pos.y--;
@@ -664,6 +688,10 @@ function playerDrop() {
 
 // Hard drop - drop the piece all the way down
 function playerHardDrop() {
+    if (lineClearAnimation) {
+        return;
+    }
+
     while (!collide()) {
         player.pos.y++;
     }
@@ -672,14 +700,10 @@ function playerHardDrop() {
     dropCounter = 0;
 }
 
-// Sweep completed lines - more efficient version
-function sweep() {
-    let lineCount = 0;
-    let y = ROWS - 1;
+function getCompletedRows() {
+    const completedRows = [];
 
-    // Process from bottom to top
-    while (y >= 0) {
-        // Check if the entire row is filled
+    for (let y = 0; y < ROWS; y++) {
         let isComplete = true;
         for (let x = 0; x < COLS; x++) {
             if (board[y][x] === 0) {
@@ -689,42 +713,194 @@ function sweep() {
         }
 
         if (isComplete) {
-            // Found a complete line, remove it and shift everything down
-            for (let row = y; row > 0; row--) {
-                for (let x = 0; x < COLS; x++) {
-                    board[row][x] = board[row - 1][x];
-                }
-            }
-
-            // Fill the top row with zeros
-            for (let x = 0; x < COLS; x++) {
-                board[0][x] = 0;
-            }
-
-            lineCount++;
-            // Don't increment y, check the same position again since we shifted
-        } else {
-            y--; // Move to the next row
+            completedRows.push(y);
         }
     }
 
-    if (lineCount > 0) {
-        // Update score based on number of lines cleared
-        if (lineCount === 1) {
-            score += 40 * level;
-        } else if (lineCount === 2) {
-            score += 100 * level;
-        } else if (lineCount === 3) {
-            score += 300 * level;
-        } else if (lineCount === 4) {
-            score += 1200 * level;
+    return completedRows;
+}
+
+function startLineClearAnimation(completedRows) {
+    lineClearAnimation = {
+        rows: [...completedRows],
+        startTime: null,
+        duration: getLineClearAnimationDuration()
+    };
+    player.matrix = null;
+    dropCounter = 0;
+}
+
+function getLineClearAnimationDuration() {
+    const prefersReducedMotion = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    return prefersReducedMotion ? 160 : LINE_CLEAR_ANIMATION_DURATION;
+}
+
+function getLineClearProgress(currentTime = performance.now()) {
+    if (!lineClearAnimation) {
+        return 1;
+    }
+
+    if (lineClearAnimation.startTime === null) {
+        lineClearAnimation.startTime = currentTime;
+    }
+
+    return Math.min(
+        (currentTime - lineClearAnimation.startTime) / lineClearAnimation.duration,
+        1
+    );
+}
+
+function updateLineClearAnimation(currentTime) {
+    const progress = getLineClearProgress(currentTime);
+
+    if (progress < 1) {
+        return;
+    }
+
+    const clearedCount = lineClearAnimation.rows.length;
+    removeCompletedRows(lineClearAnimation.rows);
+    lineClearAnimation = null;
+    applyLineClearScore(clearedCount);
+    playerReset();
+    updateScore();
+    updateControlButtons();
+}
+
+function removeCompletedRows(rowsToClear) {
+    const clearSet = new Set(rowsToClear);
+    board = board.filter((row, y) => !clearSet.has(y));
+
+    while (board.length < ROWS) {
+        board.unshift(Array(COLS).fill(0));
+    }
+}
+
+function applyLineClearScore(lineCount) {
+    if (lineCount === 1) {
+        score += 40 * level;
+    } else if (lineCount === 2) {
+        score += 100 * level;
+    } else if (lineCount === 3) {
+        score += 300 * level;
+    } else if (lineCount === 4) {
+        score += 1200 * level;
+    }
+
+    lines += lineCount;
+    level = Math.floor(lines / 10) + 1;
+    // Ensure drop interval doesn't become too fast or negative
+    dropInterval = Math.max(100, 1000 - (level - 1) * 50);
+}
+
+function drawLineClearAnimation() {
+    if (!lineClearAnimation) {
+        return;
+    }
+
+    const currentTime = performance.now();
+    const progress = getLineClearProgress(currentTime);
+    const flare = Math.sin(progress * Math.PI);
+    const boardWidth = COLS * blockSize;
+
+    ctx.save();
+    lineClearAnimation.rows.forEach(rowIndex => {
+        const rowY = offsetY + rowIndex * blockSize;
+        const scorchAlpha = Math.min(0.58, progress * 0.72);
+
+        ctx.fillStyle = `rgba(8, 2, 0, ${scorchAlpha})`;
+        ctx.fillRect(offsetX, rowY, boardWidth, blockSize);
+    });
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    lineClearAnimation.rows.forEach(rowIndex => {
+        const rowY = offsetY + rowIndex * blockSize;
+        const rowGlow = ctx.createLinearGradient(offsetX, rowY, offsetX + boardWidth, rowY);
+        rowGlow.addColorStop(0, `rgba(255, 78, 16, ${0.12 + flare * 0.35})`);
+        rowGlow.addColorStop(0.5, `rgba(255, 225, 56, ${0.18 + flare * 0.45})`);
+        rowGlow.addColorStop(1, `rgba(255, 78, 16, ${0.12 + flare * 0.35})`);
+
+        ctx.fillStyle = rowGlow;
+        ctx.fillRect(offsetX, rowY, boardWidth, blockSize);
+
+        ctx.fillStyle = `rgba(255, 244, 180, ${0.35 * flare})`;
+        ctx.fillRect(offsetX, rowY + blockSize * 0.45, boardWidth, Math.max(2, blockSize * 0.08));
+
+        for (let x = 0; x < COLS; x++) {
+            const cellX = offsetX + x * blockSize;
+            const pulse = Math.sin(currentTime * 0.018 + x * 1.7 + rowIndex * 0.9);
+            const flameCenter = cellX + blockSize * (0.5 + pulse * 0.08);
+            const flameBase = rowY + blockSize * (0.94 - progress * 0.18);
+            const flameHeight = blockSize * (0.56 + flare * 0.42 + pulse * 0.08);
+            const flameWidth = blockSize * (0.42 + flare * 0.18);
+
+            ctx.beginPath();
+            ctx.moveTo(flameCenter - flameWidth * 0.5, flameBase);
+            ctx.quadraticCurveTo(
+                flameCenter - flameWidth * 0.2,
+                flameBase - flameHeight * 0.55,
+                flameCenter,
+                flameBase - flameHeight
+            );
+            ctx.quadraticCurveTo(
+                flameCenter + flameWidth * 0.28,
+                flameBase - flameHeight * 0.45,
+                flameCenter + flameWidth * 0.5,
+                flameBase
+            );
+            ctx.closePath();
+            ctx.fillStyle = `rgba(255, 80, 12, ${0.34 + flare * 0.45})`;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(flameCenter - flameWidth * 0.22, flameBase);
+            ctx.quadraticCurveTo(
+                flameCenter - flameWidth * 0.08,
+                flameBase - flameHeight * 0.36,
+                flameCenter,
+                flameBase - flameHeight * 0.62
+            );
+            ctx.quadraticCurveTo(
+                flameCenter + flameWidth * 0.14,
+                flameBase - flameHeight * 0.28,
+                flameCenter + flameWidth * 0.22,
+                flameBase
+            );
+            ctx.closePath();
+            ctx.fillStyle = `rgba(255, 236, 88, ${0.28 + flare * 0.5})`;
+            ctx.fill();
         }
 
-        lines += lineCount;
-        level = Math.floor(lines / 10) + 1;
-        // Ensure drop interval doesn't become too fast or negative
-        dropInterval = Math.max(100, 1000 - (level - 1) * 50);
+        for (let spark = 0; spark < COLS * 2; spark++) {
+            const sparkSeed = spark * 37 + rowIndex * 19;
+            const sparkProgress = (progress + (sparkSeed % 11) / 16) % 1;
+            const sparkX = offsetX + ((sparkSeed % 101) / 101) * boardWidth;
+            const sparkY = rowY + blockSize * (0.92 - sparkProgress * 1.08);
+            const sparkRadius = Math.max(1.2, blockSize * (0.035 + flare * 0.025));
+            const sparkAlpha = (1 - sparkProgress) * (0.35 + flare * 0.55);
 
+            ctx.beginPath();
+            ctx.arc(sparkX, sparkY, sparkRadius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 196, 64, ${sparkAlpha})`;
+            ctx.fill();
+        }
+    });
+
+    ctx.restore();
+}
+
+// Sweep completed lines - more efficient version
+function sweep() {
+    const completedRows = getCompletedRows();
+    const lineCount = completedRows.length;
+
+    if (lineCount > 0) {
+        removeCompletedRows(completedRows);
+        applyLineClearScore(lineCount);
         updateScore();
     }
 }
@@ -842,7 +1018,11 @@ function update(currentTime = 0) {
     const deltaTime = currentTime - lastFrameTime;
     lastFrameTime = currentTime;
 
-    if (!paused && !gameOver) {
+    if (!paused && !gameOver && lineClearAnimation) {
+        updateLineClearAnimation(currentTime);
+    }
+
+    if (!paused && !gameOver && !lineClearAnimation) {
         dropCounter += deltaTime;
         if (dropCounter > dropInterval) {
             playerDrop();

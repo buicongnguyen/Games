@@ -25,6 +25,7 @@ A classic Tetris game implemented using HTML5 Canvas and vanilla JavaScript with
 - Level progression that increases game speed
 - Next piece preview
 - Line clearing mechanics (1, 2, 3, or 4 lines at once)
+- Burning row clear animation with flames and sparks
 - Game over detection with restart option
 - Mobile touch controls with a draggable control panel
 - Generated neon arcade background art for the game shell
