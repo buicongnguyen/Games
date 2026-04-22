@@ -140,6 +140,10 @@ input {
   border-radius: 8px;
 }
 
+.controls[hidden] {
+  display: none;
+}
+
 .control {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -327,6 +331,11 @@ button svg {
   }
 
   .game-root canvas {
+    inset: 0;
+    height: 100% !important;
+  }
+
+  .stage.is-full-game .game-root {
     inset: 0;
     height: 100% !important;
   }

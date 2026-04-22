@@ -17,14 +17,14 @@
             <span>Sky Drill</span>
           </div>
           <div class="stats">
-            <span>Stage <strong id="stage-value">1/3</strong></span>
-            <span>Targets <strong id="targets-value">0/0</strong></span>
-            <span>Pods <strong id="pods-value">0</strong></span>
-            <span>Score <strong id="score-value">0</strong></span>
+            <span><span id="stage-label">Level</span> <strong id="stage-value">1/6</strong></span>
+            <span><span id="targets-label">Targets</span> <strong id="targets-value">0/0</strong></span>
+            <span><span id="pods-label">Pods</span> <strong id="pods-value">0</strong></span>
+            <span><span id="score-label">Score</span> <strong id="score-value">0</strong></span>
           </div>
         </header>
 
-        <section class="hud controls" aria-label="Drop controls">
+        <section id="drop-controls" class="hud controls" aria-label="Drop controls">
           <label class="control">
             <span>Angle</span>
             <input id="angle-input" type="range" min="-55" max="55" step="1" value="12" />
@@ -107,6 +107,6 @@
 
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-    <script src="./src/game.js?v=bomb-setup-1"></script>
+    <script src="./src/game.js?v=chapters-1"></script>
   </body>
 </html>

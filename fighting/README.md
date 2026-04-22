@@ -1,9 +1,11 @@
 # Sky Drill
 
-A small browser prototype for a fictional arcade strike-training puzzle. Time the plane pass, tune the drill pod angle and speed, and cut through destructible building blocks to tag the hidden stick targets.
+A fictional arcade campaign prototype with three chapters.
 
-The current build has three stages. Stage 1 keeps the original island layout with smaller targets and a tighter hit window, then later stages add faster plane passes and fewer pods.
+Chapter 1 has six bombing levels: three single-target buildings, then three group-target buildings where the pod count is much lower than the target count. The bomb setup panel supports all-pod or next-pod settings, drill depth, bounce count, fuse delay, and blast radius.
 
-The bomb setup panel supports all-pod or next-pod settings, drill depth, bounce count, fuse delay, and blast radius. Pods drill a narrow hole while moving, then detonate with a larger room-sized blast.
+Chapter 2 switches to a canal survival level where the ship stays near the middle of the screen, bankside guns fire at it, dim red mines brighten as they get close, and three armor layers protect the controller.
+
+Chapter 3 switches to helicopter defense over a mountain river. Click holes, stick figures, launchers, or incoming missiles; press `1` for gun and `2` for missile.
 
 Open `index.html` in a browser, or serve the folder with a local static server.
