@@ -200,15 +200,36 @@
   const SHIP_BULLET_SPEED = 780;
 
   const HELI_LEVELS = [
-    { name: "Chapter 3-1", duration: 42, holes: 8, missileRate: 2.8 },
-    { name: "Chapter 3-2", duration: 50, holes: 10, missileRate: 2.25 },
-    { name: "Chapter 3-3", duration: 58, holes: 12, missileRate: 1.85 },
+    { name: "Chapter 3-1", duration: 42, holes: 12, missileRate: 2.8 },
+    { name: "Chapter 3-2", duration: 50, holes: 15, missileRate: 2.25 },
+    { name: "Chapter 3-3", duration: 58, holes: 18, missileRate: 1.85 },
   ];
 
   const HELI_BASE = { x: WORLD.width / 2, y: 462 };
   const HELI_LIMITS = { left: 268, right: 692, top: 350, bottom: 500 };
   const HELI_MOVE_SPEED = 236;
   const HELI_FIRE_RATE = 0.18;
+  const HELI_HOLE_APPEAR_TIME = 1.15;
+  const HELI_HOLE_POSITIONS = [
+    [118, 154, 16],
+    [206, 100, 14],
+    [292, 178, 15],
+    [382, 254, 14],
+    [482, 132, 18],
+    [586, 202, 15],
+    [692, 118, 16],
+    [814, 168, 15],
+    [156, 286, 14],
+    [246, 360, 13],
+    [346, 314, 14],
+    [438, 406, 13],
+    [542, 286, 15],
+    [636, 372, 14],
+    [742, 300, 15],
+    [846, 406, 13],
+    [88, 404, 13],
+    [878, 260, 14],
+  ];
 
   function cloneBombConfig(config) {
     return {
@@ -302,6 +323,8 @@
         scale: level.targetScale,
         hitRadius: level.targetHitRadius,
         alive: true,
+        state: "crawl",
+        stateTime: -index * 0.16,
       })),
       podsLeft: level.pods,
       score,
@@ -330,6 +353,64 @@
     graphics.moveTo(x, y + 4 * s);
     graphics.lineTo(x + 9 * s, y + 17 * s);
     graphics.strokePath();
+  }
+
+  function drawCrawlingFigure(graphics, x, y, color, alpha, scale, progress) {
+    const s = scale || 1;
+    const rise = (1 - clamp(progress, 0, 1)) * 10 * s;
+    const baseY = y + rise;
+    graphics.lineStyle(Math.max(1, 2.5 * s), color, alpha);
+    graphics.strokeCircle(x - 12 * s, baseY - 10 * s, 5 * s);
+    graphics.beginPath();
+    graphics.moveTo(x - 7 * s, baseY - 7 * s);
+    graphics.lineTo(x + 11 * s, baseY - 4 * s);
+    graphics.moveTo(x - 1 * s, baseY - 6 * s);
+    graphics.lineTo(x - 11 * s, baseY + 4 * s);
+    graphics.moveTo(x + 4 * s, baseY - 5 * s);
+    graphics.lineTo(x + 15 * s, baseY + 4 * s);
+    graphics.moveTo(x + 8 * s, baseY - 4 * s);
+    graphics.lineTo(x + 4 * s, baseY + 9 * s);
+    graphics.moveTo(x - 4 * s, baseY - 7 * s);
+    graphics.lineTo(x - 15 * s, baseY - 1 * s);
+    graphics.strokePath();
+  }
+
+  function drawEnemyFigure(graphics, x, y, color, alpha, scale, pose, progress) {
+    const s = scale || 1;
+    const t = clamp(progress || 0, 0, 1);
+    if (pose === "crawl") {
+      drawCrawlingFigure(graphics, x, y, color, alpha, s, t);
+      return;
+    }
+    if (pose === "fall") {
+      graphics.save();
+      graphics.translateCanvas(x, y + 4 * s * t);
+      graphics.rotateCanvas(1.2 * t);
+      drawStickFigure(graphics, 0, 0, color, alpha * (1 - t * 0.25), s);
+      graphics.restore();
+      return;
+    }
+    if (pose === "explode") {
+      graphics.fillStyle(palette.blast, alpha * (0.24 + 0.18 * (1 - t)));
+      graphics.fillCircle(x, y - 10 * s, (8 + 18 * t) * s);
+      graphics.lineStyle(Math.max(1, 2 * s), palette.shock, alpha * (1 - t));
+      graphics.strokeCircle(x, y - 10 * s, (12 + 24 * t) * s);
+      graphics.lineStyle(Math.max(1, 2.3 * s), color, alpha * (1 - t) * 0.55);
+      graphics.lineBetween(x - 14 * s, y - 18 * s, x + 14 * s, y + 4 * s);
+      graphics.lineBetween(x + 14 * s, y - 18 * s, x - 14 * s, y + 4 * s);
+      return;
+    }
+    if (pose === "sink") {
+      const fade = alpha * (1 - t);
+      const sinkY = y + 20 * s * t;
+      drawStickFigure(graphics, x, sinkY, color, fade, s);
+      graphics.fillStyle(0x24341f, 0.72);
+      graphics.fillEllipse(x, y + 18 * s, 32 * s, 9 * s);
+      graphics.fillStyle(0x5f7a3f, 0.5);
+      graphics.fillEllipse(x + 2 * s, y + 18 * s, 22 * s, 5 * s);
+      return;
+    }
+    drawStickFigure(graphics, x, y, color, alpha, s);
   }
 
   function drawPlane(graphics, x, y, scale, banking) {
@@ -371,11 +452,11 @@
     }
 
     preload() {
-      this.load.image("bg-bombing", "assets/chapter1-bombing-bg.png");
-      this.load.image("bg-ship", "assets/chapter2-canal-bg.png");
-      this.load.image("bg-ship-bank-left", "assets/chapter2-left-bank-scroll.png");
-      this.load.image("bg-ship-bank-right", "assets/chapter2-right-bank-scroll.png");
-      this.load.image("bg-heli", "assets/chapter3-heli-bg.png");
+      this.load.image("bg-bombing", "assets/chapter1-bombing-bg.png?v=flow-fix-1");
+      this.load.image("bg-ship", "assets/chapter2-canal-bg.png?v=flow-fix-1");
+      this.load.image("bg-ship-bank-left", "assets/chapter2-left-bank-scroll.png?v=flow-fix-1");
+      this.load.image("bg-ship-bank-right", "assets/chapter2-right-bank-scroll.png?v=flow-fix-1");
+      this.load.image("bg-heli", "assets/chapter3-heli-bg.png?v=flow-fix-1");
     }
 
     create() {
@@ -823,6 +904,7 @@
       state.activePods = state.activePods.filter((pod) => !pod.dead);
       els.drop.disabled =
         state.finished || state.pendingDrop || state.activePods.length > 0 || state.podsLeft <= 0;
+      this.updateBombingTargets(dt);
 
       if (!state.finished && state.activePods.length === 0 && state.podsLeft <= 0) {
         if (state.targets.some((target) => target.alive)) {
@@ -849,6 +931,36 @@
           this.loadBombingLevel(next, state.score, `${CHAPTER1_LEVELS[next].name}: efficient pods`);
         } else {
           this.loadShipLevel(0, state.score, "Chapter 2: steer through the canal");
+        }
+      }
+    }
+
+    updateBombingTargets(dt) {
+      for (const target of this.bombing.targets) {
+        target.stateTime += dt;
+        if (target.alive) {
+          if (target.state === "crawl" && target.stateTime >= 1.15) {
+            target.state = "standing";
+            target.stateTime = 0;
+          }
+          continue;
+        }
+        if (target.state === "fall" && target.stateTime >= 0.34) {
+          target.state = "explode";
+          target.stateTime = 0;
+          this.bombing.blastRings.push({
+            x: target.x,
+            y: target.y - 12 * target.scale,
+            radius: 18 * target.scale,
+            life: 0.28,
+            maxLife: 0.28,
+          });
+        } else if (target.state === "explode" && target.stateTime >= 0.36) {
+          target.state = "sink";
+          target.stateTime = 0;
+        } else if (target.state === "sink" && target.stateTime >= 1.05) {
+          target.state = "gone";
+          target.stateTime = 0;
         }
       }
     }
@@ -962,9 +1074,11 @@
 
     markBombingTarget(target) {
       target.alive = false;
+      target.state = "fall";
+      target.stateTime = 0;
       this.bombing.score += 120;
       this.score = this.bombing.score;
-      this.makeBurst(this.bombing, target.x, target.y - 14 * target.scale, palette.targetDone, 10, 0.58);
+      this.makeBurst(this.bombing, target.x, target.y - 14 * target.scale, palette.targetDone, 8, 0.42);
       this.showMessage("Target marked");
     }
 
@@ -1029,7 +1143,7 @@
         this.bombing.finished = true;
         this.bombing.score += this.bombing.podsLeft * this.bombing.level.bonusPerPod;
         this.score = this.bombing.score;
-        this.bombing.advanceAt = this.elapsed + 1.55;
+        this.bombing.advanceAt = this.elapsed + 2.05;
         this.showMessage(`${this.bombing.level.name} clear`);
       }
     }
@@ -1184,16 +1298,23 @@
 
     drawBombingTargets() {
       for (const target of this.bombing.targets) {
+        if (target.state === "gone") {
+          continue;
+        }
         const color = target.alive ? palette.target : palette.targetDone;
-        const alpha = target.alive ? 1 : 0.52;
+        const pose = target.state || (target.alive ? "standing" : "sink");
+        const poseDuration =
+          pose === "crawl" ? 1.15 : pose === "fall" ? 0.34 : pose === "explode" ? 0.36 : pose === "sink" ? 1.05 : 1;
+        const progress = clamp(target.stateTime / poseDuration, 0, 1);
+        const alpha = target.alive ? 1 : pose === "sink" ? Math.max(0.1, 1 - progress) : 0.86;
         const s = target.scale;
-        const boxW = 30 * s + 8;
-        const boxH = 54 * s + 8;
-        this.map.fillStyle(0x0b1117, target.alive ? 0.72 : 0.38);
-        this.map.fillRoundedRect(target.x - boxW / 2, target.y - boxH + 10 * s, boxW, boxH, 4);
-        this.map.lineStyle(1, color, target.alive ? 0.42 : 0.24);
-        this.map.strokeCircle(target.x, target.y - 8 * s, target.hitRadius);
-        drawStickFigure(this.map, target.x, target.y, color, alpha, s);
+        this.map.fillStyle(0x0b1117, target.alive ? 0.42 : 0.22);
+        this.map.fillEllipse(target.x, target.y + 15 * s, 34 * s, 9 * s);
+        if (target.alive) {
+          this.map.lineStyle(1, color, 0.42);
+          this.map.strokeCircle(target.x, target.y - 8 * s, target.hitRadius);
+        }
+        drawEnemyFigure(this.map, target.x, target.y, color, alpha, s, pose, progress);
       }
     }
 
@@ -1370,6 +1491,7 @@
         bullet.x += bullet.vx * dt;
         bullet.y += bullet.vy * dt;
         bullet.life -= dt;
+        let hitHazard = false;
         for (const gun of state.guns) {
           if (!gun.alive) {
             continue;
@@ -1378,11 +1500,29 @@
           if (pointSegmentDistance(gunX, gun.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < 42) {
             gun.alive = false;
             bullet.life = 0;
+            hitHazard = true;
             state.score += 40;
             this.score = state.score;
-            this.shipHitFx(gunX, gun.y, palette.blast);
+            this.shipHitFx(gunX, gun.y, palette.blast, 10, 0.78);
             this.showMessage("Cannon disabled");
             break;
+          }
+        }
+        if (!hitHazard) {
+          for (const mine of state.mines) {
+            if (mine.exploded) {
+              continue;
+            }
+            const radius = 14 + (mine.alert || 0) * 13;
+            if (pointSegmentDistance(mine.x, mine.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < radius) {
+              mine.exploded = true;
+              bullet.life = 0;
+              state.score += 28;
+              this.score = state.score;
+              this.shipHitFx(mine.x, mine.y, palette.blast, 12, 0.72);
+              this.showMessage("Mine detonated");
+              break;
+            }
           }
         }
       }
@@ -1467,18 +1607,20 @@
       this.ship.fireCooldown = SHIP_FIRE_RATE;
     }
 
-    shipHitFx(x, y, color) {
-      for (let i = 0; i < 12; i += 1) {
+    shipHitFx(x, y, color, count, sizeScale) {
+      const total = count || 12;
+      const scale = sizeScale || 1;
+      for (let i = 0; i < total; i += 1) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = Phaser.Math.Between(30, 120);
+        const speed = Phaser.Math.Between(30, 120) * scale;
         this.ship.fx.push({
           x,
           y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: 0.45,
+          life: 0.32 + 0.16 * scale,
           maxLife: 0.45,
-          size: Phaser.Math.Between(2, 5),
+          size: Phaser.Math.Between(2, 5) * scale,
           color,
         });
       }
@@ -1538,7 +1680,17 @@
       for (const mine of state.mines) {
         const alert = mine.alert || 0;
         const radius = 5 + alert * 15 + Math.sin(mine.pulse) * (1 + alert * 2);
-        this.map.fillStyle(0xff2f2f, 0.18 + alert * 0.72);
+        this.map.lineStyle(1.5, 0xffb0a0, 0.18 + alert * 0.68);
+        for (let i = 0; i < 8; i += 1) {
+          const angle = mine.pulse * 0.22 + (i / 8) * Math.PI * 2;
+          this.map.lineBetween(
+            mine.x + Math.cos(angle) * radius * 0.72,
+            mine.y + Math.sin(angle) * radius * 0.72,
+            mine.x + Math.cos(angle) * (radius + 6),
+            mine.y + Math.sin(angle) * (radius + 6)
+          );
+        }
+        this.map.fillStyle(0xff2f2f, 0.22 + alert * 0.7);
         this.map.fillCircle(mine.x, mine.y, radius);
         this.map.lineStyle(1, 0xffb0a0, 0.2 + alert * 0.6);
         this.map.strokeCircle(mine.x, mine.y, radius + 5);
@@ -1640,32 +1792,21 @@
         finished: false,
         messageUntil: 0,
       };
-      const positions = [
-        [148, 176, 19],
-        [248, 122, 17],
-        [356, 258, 16],
-        [498, 162, 22],
-        [642, 236, 18],
-        [782, 142, 19],
-        [176, 334, 17],
-        [314, 374, 15],
-        [462, 318, 18],
-        [610, 356, 16],
-        [758, 302, 17],
-        [840, 404, 15],
-      ];
+      const immediateHoles = Math.ceil(level.holes * 0.58);
       for (let i = 0; i < level.holes; i += 1) {
-        const [x, y, r] = positions[i];
+        const [x, y, r] = HELI_HOLE_POSITIONS[i % HELI_HOLE_POSITIONS.length];
+        const spawnDelay = i < immediateHoles ? 0 : (i - immediateHoles + 1) * 1.25 + Phaser.Math.FloatBetween(0.1, 0.55);
         this.heli.holes.push({
           x,
           y,
           r,
-          state: "open",
-          timer: Phaser.Math.FloatBetween(0.2, 1.8),
+          state: spawnDelay > 0 ? "hidden" : "open",
+          timer: spawnDelay > 0 ? -spawnDelay : Phaser.Math.FloatBetween(0.2, 1.8),
+          appearDuration: HELI_HOLE_APPEAR_TIME + Phaser.Math.FloatBetween(-0.12, 0.18),
           missileCooldown: level.missileRate,
         });
       }
-      this.showMessage(message || `${level.name}: move A/D, click holes and missiles`);
+      this.showMessage(message || `${level.name}: move, fire holes and missiles`);
       this.refreshHud(true);
     }
 
@@ -1721,10 +1862,15 @@
       }
 
       for (const hole of state.holes) {
+        if (hole.state === "hidden") {
+          continue;
+        }
+        const holeScale =
+          hole.state === "appearing" ? clamp(hole.timer / (hole.appearDuration || HELI_HOLE_APPEAR_TIME), 0.25, 1) : 1;
         const distance = isMissile
           ? Math.hypot(hole.x - x, hole.y - y)
           : pointSegmentDistance(hole.x, hole.y, fromX, fromY, x, y);
-        if (distance <= radius + hole.r * 0.5) {
+        if (distance <= radius + hole.r * holeScale * 0.5) {
           if (hole.state === "enemy") {
             state.score += 60;
             this.score = state.score;
@@ -1781,15 +1927,31 @@
       }
 
       for (const hole of state.holes) {
-        hole.timer += dt;
-        if (hole.state === "closed") {
-          hole.timer -= dt * 2;
-          if (hole.timer <= 0) {
+        if (hole.state === "hidden") {
+          hole.timer += dt;
+          if (hole.timer >= 0) {
+            hole.state = "appearing";
+            hole.timer = 0;
+          }
+          continue;
+        }
+        if (hole.state === "appearing") {
+          hole.timer += dt;
+          if (hole.timer >= (hole.appearDuration || HELI_HOLE_APPEAR_TIME)) {
             hole.state = "open";
             hole.timer = 0;
           }
           continue;
         }
+        if (hole.state === "closed") {
+          hole.timer -= dt;
+          if (hole.timer <= 0) {
+            hole.state = "appearing";
+            hole.timer = 0;
+          }
+          continue;
+        }
+        hole.timer += dt;
         if (hole.state === "open" && hole.timer > 1.4) {
           hole.state = "enemy";
           hole.timer = 0;
@@ -1921,18 +2083,30 @@
       }
 
       for (const hole of state.holes) {
+        if (hole.state === "hidden") {
+          continue;
+        }
         const closed = hole.state === "closed";
-        this.map.fillStyle(closed ? 0x455044 : 0x15191b, 1);
-        this.map.fillEllipse(hole.x, hole.y, hole.r * 2.1, hole.r * 1.25);
-        this.map.lineStyle(2, closed ? 0x7da16f : 0xa4aeb6, closed ? 0.45 : 0.35);
-        this.map.strokeEllipse(hole.x, hole.y, hole.r * 2.1, hole.r * 1.25);
+        const appearing = hole.state === "appearing";
+        const appearProgress = appearing ? clamp(hole.timer / (hole.appearDuration || HELI_HOLE_APPEAR_TIME), 0, 1) : 1;
+        const drawR = hole.r * (appearing ? 0.28 + appearProgress * 0.72 : 1);
+        const holeAlpha = appearing ? 0.35 + appearProgress * 0.65 : 1;
+        this.map.fillStyle(closed ? 0x455044 : 0x15191b, holeAlpha);
+        this.map.fillEllipse(hole.x, hole.y, drawR * 2.1, drawR * 1.25);
+        this.map.lineStyle(2, closed ? 0x7da16f : 0xa4aeb6, (closed ? 0.45 : 0.35) * holeAlpha);
+        this.map.strokeEllipse(hole.x, hole.y, drawR * 2.1, drawR * 1.25);
+        if (appearing) {
+          this.map.lineStyle(1, 0xd1ddbd, 0.3 * appearProgress);
+          this.map.strokeEllipse(hole.x, hole.y, drawR * 2.7, drawR * 1.55);
+        }
         if (hole.state === "enemy") {
-          drawStickFigure(this.map, hole.x, hole.y + hole.r * 0.44, palette.target, 1, 0.32);
+          const emerge = clamp(hole.timer / 0.9, 0, 1);
+          drawEnemyFigure(this.map, hole.x, hole.y + hole.r * 0.44, palette.target, 1, 0.26, emerge < 1 ? "crawl" : "standing", emerge);
         } else if (hole.state === "launcher") {
           this.map.fillStyle(0x2b3136, 1);
           this.map.fillRoundedRect(hole.x - 10, hole.y - 9, 20, 18, 4);
           this.map.fillStyle(palette.target, 1);
-          drawStickFigure(this.map, hole.x + 12, hole.y + hole.r * 0.44, palette.target, 1, 0.28);
+          drawEnemyFigure(this.map, hole.x + 12, hole.y + hole.r * 0.44, palette.target, 1, 0.24, "standing", 1);
           this.map.fillStyle(palette.pod, 1);
           this.map.fillTriangle(hole.x - 3, hole.y - 23, hole.x + 7, hole.y - 4, hole.x - 13, hole.y - 4);
         }
