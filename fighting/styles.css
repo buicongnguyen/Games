@@ -164,6 +164,16 @@ input {
   width: 100%;
 }
 
+.status-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.status-actions .skip-button {
+  min-width: 0;
+}
+
 .controls {
   left: 14px;
   right: 14px;
@@ -474,6 +484,10 @@ button svg {
 
   .status-panel {
     width: min(330px, calc(100vw - 22px));
+  }
+
+  .status-actions {
+    gap: 6px;
   }
 
   .stats {

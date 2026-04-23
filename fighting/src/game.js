@@ -42,6 +42,7 @@
     pods: document.getElementById("pods-value"),
     scoreLabel: document.getElementById("score-label"),
     score: document.getElementById("score-value"),
+    redo: document.getElementById("redo-button"),
     skip: document.getElementById("skip-button"),
     statusToggle: document.getElementById("status-toggle-button"),
     statusPanel: document.getElementById("status-panel"),
@@ -535,6 +536,10 @@
 
       els.drop.addEventListener("click", () => this.queueDrop());
       els.reset.addEventListener("click", () => this.resetCurrentLevel());
+      els.redo.addEventListener("click", () => {
+        this.toggleStatusPanel(false);
+        this.resetCurrentLevel();
+      });
       els.skip.addEventListener("click", () => {
         this.toggleStatusPanel(false);
         this.skipCurrentLevel();
