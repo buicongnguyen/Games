@@ -195,10 +195,17 @@
   ];
 
   const SHIP_CENTER = { x: WORLD.width / 2, y: 316 };
-  const SHIP_LIMITS = { left: 242, right: 718, top: 148, bottom: 458 };
-  const SHIP_MOVE_SPEED = 218;
-  const SHIP_FIRE_RATE = 0.18;
-  const SHIP_BULLET_SPEED = 780;
+  const SHIP_LIMITS = { left: 214, right: 746, top: 130, bottom: 472 };
+  const SHIP_MOVE_SPEED = 224;
+  const SHIP_FIRE_RATE = 0.13;
+  const SHIP_BULLET_SPEED = 980;
+  const SHIP_BULLET_LIFE = 2.25;
+  const SHIP_BANK_WIDTH = 224;
+  const SHIP_GUN_LEFT_X = 118;
+  const SHIP_GUN_RIGHT_X = WORLD.width - SHIP_GUN_LEFT_X;
+  const SHIP_MINE_SPREAD = 244;
+  const SHIP_WATER_LEFT = 204;
+  const SHIP_WATER_WIDTH = 552;
 
   const HELI_LEVELS = [
     { name: "Chapter 3-1", duration: 42, holes: 12, missileRate: 2.8 },
@@ -465,9 +472,9 @@
 
     preload() {
       this.load.image("bg-bombing", "assets/chapter1-bombing-bg.png?v=flow-fix-1");
-      this.load.image("bg-ship", "assets/chapter2-canal-bg.png?v=flow-fix-1");
-      this.load.image("bg-ship-bank-left", "assets/chapter2-left-bank-scroll.png?v=flow-fix-1");
-      this.load.image("bg-ship-bank-right", "assets/chapter2-right-bank-scroll.png?v=flow-fix-1");
+      this.load.image("bg-ship", "assets/chapter2-canal-bg.png?v=flow-fix-4");
+      this.load.image("bg-ship-bank-left", "assets/chapter2-left-bank-scroll.png?v=flow-fix-4");
+      this.load.image("bg-ship-bank-right", "assets/chapter2-right-bank-scroll.png?v=flow-fix-4");
       this.load.image("bg-heli", "assets/chapter3-heli-bg.png?v=flow-fix-1");
     }
 
@@ -484,12 +491,13 @@
         image.setVisible(false);
       });
       this.shipBankScrolls = {
-        left: this.add.tileSprite(0, 0, 300, WORLD.height, "bg-ship-bank-left"),
-        right: this.add.tileSprite(WORLD.width - 300, 0, 300, WORLD.height, "bg-ship-bank-right"),
+        left: this.add.tileSprite(0, 0, SHIP_BANK_WIDTH, WORLD.height, "bg-ship-bank-left"),
+        right: this.add.tileSprite(WORLD.width - SHIP_BANK_WIDTH, 0, SHIP_BANK_WIDTH, WORLD.height, "bg-ship-bank-right"),
       };
       Object.values(this.shipBankScrolls).forEach((image) => {
         image.setOrigin(0, 0);
         image.setDepth(-19);
+        image.setAlpha(0.68);
         image.setVisible(false);
       });
       this.setChapterBackground("bombing");
@@ -1419,13 +1427,15 @@
         scroll: 0,
         shipX: 0,
         shipY: 0,
-        armor: 3,
+        armor: 9,
+        shieldHp: [3, 3, 3],
         bullets: [],
         playerBullets: [],
         mines: [],
         guns: [],
         fx: [],
         fireCooldown: 0,
+        autoTarget: null,
         failed: false,
         finished: false,
         messageUntil: 0,
@@ -1448,7 +1458,7 @@
 
     createMine(y) {
       return {
-        x: WORLD.width / 2 + Phaser.Math.Between(-196, 196),
+        x: WORLD.width / 2 + Phaser.Math.Between(-SHIP_MINE_SPREAD, SHIP_MINE_SPREAD),
         y,
         pulse: Math.random() * Math.PI * 2,
         exploded: false,
@@ -1477,8 +1487,13 @@
       state.shipY = clamp(state.shipY, SHIP_LIMITS.top - SHIP_CENTER.y, SHIP_LIMITS.bottom - SHIP_CENTER.y);
       const ship = this.shipPosition();
       state.fireCooldown = Math.max(0, state.fireCooldown - dt);
-      if (this.firePad.active && state.fireCooldown <= 0) {
-        this.fireShipGun(this.firePad);
+      state.autoTarget = null;
+      if (state.fireCooldown <= 0) {
+        state.autoTarget = this.firePad.active ? null : this.pickShipAutoTarget(ship);
+        const shotDirection = this.firePad.active ? this.firePad : state.autoTarget;
+        if (shotDirection) {
+          this.fireShipGun(shotDirection);
+        }
       }
 
       for (const gun of state.guns) {
@@ -1493,7 +1508,7 @@
         }
         gun.cooldown -= dt;
         if (gun.y > 58 && gun.y < WORLD.height - 34 && gun.cooldown <= 0) {
-          const x = gun.side < 0 ? 180 : 780;
+          const x = gun.side < 0 ? SHIP_GUN_LEFT_X : SHIP_GUN_RIGHT_X;
           const y = gun.y;
           const angle = Math.atan2(ship.y - y, ship.x - x);
           state.bullets.push({ x, y, vx: Math.cos(angle) * 185, vy: Math.sin(angle) * 185, life: 4 });
@@ -1512,7 +1527,7 @@
           if (!gun.alive) {
             continue;
           }
-          const gunX = gun.side < 0 ? 190 : 770;
+          const gunX = gun.side < 0 ? SHIP_GUN_LEFT_X : SHIP_GUN_RIGHT_X;
           if (pointSegmentDistance(gunX, gun.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < 42) {
             gun.alive = false;
             bullet.life = 0;
@@ -1551,12 +1566,17 @@
         bullet.y += bullet.vy * dt;
         bullet.life -= dt;
         const distance = Math.hypot(bullet.x - ship.x, bullet.y - ship.y);
-        if (distance < 42 && state.armor > 0) {
-          state.armor -= 1;
+        if (distance < 15) {
+          this.failShip("Controller hit");
+          bullet.life = 0;
+        } else if (distance < 52) {
+          if (state.armor > 0) {
+            this.damageShipShield("Gun hit");
+          } else {
+            this.failShip("Hull hit");
+          }
           bullet.life = 0;
           this.shipHitFx(bullet.x, bullet.y, palette.shock);
-        } else if (distance < 15) {
-          this.failShip("Controller hit");
         }
       }
       state.bullets = state.bullets.filter((bullet) => bullet.life > 0 && bullet.x > -40 && bullet.x < WORLD.width + 40 && bullet.y > -40 && bullet.y < WORLD.height + 40);
@@ -1565,14 +1585,18 @@
         mine.y += state.level.riverSpeed * dt;
         mine.pulse += dt * 5;
         const distance = Math.hypot(mine.x - ship.x, mine.y - ship.y);
-        mine.alert = clamp(1 - distance / 150, 0, 1);
-        if (!mine.exploded && distance < 30 + mine.alert * 24) {
+        mine.alert = clamp(1 - distance / 178, 0, 1);
+        if (!mine.exploded && distance < 18) {
+          mine.exploded = true;
+          this.shipHitFx(mine.x, mine.y, palette.blast);
+          this.failShip("Controller hit");
+        } else if (!mine.exploded && distance < 38 + mine.alert * 26) {
           mine.exploded = true;
           this.shipHitFx(mine.x, mine.y, palette.blast);
           if (state.armor > 0) {
-            state.armor -= 1;
+            this.damageShipShield("Mine hit");
           } else {
-            this.failShip("Mine reached controller");
+            this.failShip("Mine breached hull");
           }
         }
         if (mine.y > WORLD.height + 60 || mine.exploded) {
@@ -1589,7 +1613,7 @@
 
       if (state.timeLeft <= 0) {
         state.finished = true;
-        this.score += state.armor * 90;
+        this.score += state.armor * 30;
         const next = state.levelIndex + 1;
         if (next < SHIP_LEVELS.length) {
           this.loadShipLevel(next, this.score, `${SHIP_LEVELS[next].name}: more bankside fire`);
@@ -1601,6 +1625,70 @@
 
     shipPosition() {
       return { x: SHIP_CENTER.x + this.ship.shipX, y: SHIP_CENTER.y + this.ship.shipY };
+    }
+
+    shipShieldTotal() {
+      return this.ship ? this.ship.shieldHp.reduce((sum, hp) => sum + hp, 0) : 0;
+    }
+
+    damageShipShield(messageBase) {
+      if (!this.ship) {
+        return false;
+      }
+      const labels = ["Core", "Mid", "Outer"];
+      for (let index = this.ship.shieldHp.length - 1; index >= 0; index -= 1) {
+        if (this.ship.shieldHp[index] <= 0) {
+          continue;
+        }
+        this.ship.shieldHp[index] -= 1;
+        this.ship.armor = this.shipShieldTotal();
+        if (this.ship.shieldHp[index] <= 0) {
+          this.showMessage(`${labels[index]} shield down`);
+        } else if (messageBase) {
+          this.showMessage(`${messageBase} ${labels[index]} ${this.ship.shieldHp[index]}/3`);
+        }
+        return true;
+      }
+      return false;
+    }
+
+    pickShipAutoTarget(ship) {
+      if (!this.ship) {
+        return null;
+      }
+      const fromY = ship.y - 36;
+      let best = null;
+      const consider = (kind, x, y, bias, alert) => {
+        if (y < -28 || y > ship.y + 72 || x < 0 || x > WORLD.width) {
+          return;
+        }
+        const distance = Math.hypot(x - ship.x, y - fromY);
+        const score = distance + bias - (alert || 0) * 90;
+        if (!best || score < best.score) {
+          best = {
+            kind,
+            x: x - ship.x,
+            y: y - fromY,
+            targetX: x,
+            targetY: y,
+            score,
+          };
+        }
+      };
+
+      for (const gun of this.ship.guns) {
+        if (!gun.alive) {
+          continue;
+        }
+        consider("gun", gun.side < 0 ? SHIP_GUN_LEFT_X : SHIP_GUN_RIGHT_X, gun.y, -140, 0);
+      }
+      for (const mine of this.ship.mines) {
+        if (mine.exploded) {
+          continue;
+        }
+        consider("mine", mine.x, mine.y, mine.y > ship.y - 24 ? -70 : 26, mine.alert || 0);
+      }
+      return best;
     }
 
     fireShipGun(direction) {
@@ -1618,7 +1706,7 @@
         prevY: ship.y - 36,
         vx: (dx / length) * SHIP_BULLET_SPEED,
         vy: (dy / length) * SHIP_BULLET_SPEED,
-        life: 1.45,
+        life: SHIP_BULLET_LIFE,
       });
       this.ship.fireCooldown = SHIP_FIRE_RATE;
     }
@@ -1658,26 +1746,28 @@
         });
       }
       if (this.chapterBackgrounds) {
-        this.bg.fillStyle(0x052230, 0.12);
+        this.bg.fillStyle(0x031622, 0.12);
         this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
-        this.bg.fillStyle(palette.river, 0.14);
-        this.bg.fillRoundedRect(292, -28, 376, WORLD.height + 56, 18);
+        this.bg.fillStyle(0x0ca7d8, 0.08);
+        this.bg.fillRoundedRect(SHIP_WATER_LEFT, -32, SHIP_WATER_WIDTH, WORLD.height + 64, 26);
+        this.bg.fillStyle(0x7ef4ff, 0.05);
+        this.bg.fillRoundedRect(SHIP_WATER_LEFT + 42, -18, SHIP_WATER_WIDTH - 84, WORLD.height + 36, 22);
       } else {
         this.bg.fillStyle(0x7fb7ce, 1);
         this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
         this.bg.fillStyle(palette.bank, 1);
-        this.bg.fillRect(0, 0, 238, WORLD.height);
-        this.bg.fillRect(722, 0, 238, WORLD.height);
+        this.bg.fillRect(0, 0, 214, WORLD.height);
+        this.bg.fillRect(746, 0, 214, WORLD.height);
         this.bg.fillStyle(0x405336, 1);
-        this.bg.fillRect(0, 0, 180, WORLD.height);
-        this.bg.fillRect(780, 0, 180, WORLD.height);
+        this.bg.fillRect(0, 0, 158, WORLD.height);
+        this.bg.fillRect(802, 0, 158, WORLD.height);
         this.bg.fillStyle(palette.river, 1);
-        this.bg.fillRoundedRect(238, -20, 484, WORLD.height + 40, 14);
+        this.bg.fillRoundedRect(SHIP_WATER_LEFT, -20, SHIP_WATER_WIDTH, WORLD.height + 40, 16);
         this.bg.fillStyle(palette.riverDark, 0.28);
         for (let y = -80 + (state.scroll % 96); y < WORLD.height + 90; y += 96) {
           this.bg.fillRoundedRect(468, y, 24, 64, 10);
-          this.bg.fillRoundedRect(360, y + 30, 14, 50, 8);
-          this.bg.fillRoundedRect(590, y + 12, 14, 50, 8);
+          this.bg.fillRoundedRect(332, y + 30, 14, 50, 8);
+          this.bg.fillRoundedRect(618, y + 12, 14, 50, 8);
         }
       }
       this.drawShipMotionLayer(state);
@@ -1686,7 +1776,7 @@
         if (!gun.alive || gun.y < -32 || gun.y > WORLD.height + 32) {
           continue;
         }
-        const x = gun.side < 0 ? 190 : 770;
+        const x = gun.side < 0 ? SHIP_GUN_LEFT_X : SHIP_GUN_RIGHT_X;
         this.map.fillStyle(0x2d3338, 1);
         this.map.fillRoundedRect(x - 14, gun.y - 12, 28, 24, 4);
         this.map.fillStyle(0x1a2026, 1);
@@ -1718,21 +1808,51 @@
       }
 
       for (const bullet of state.playerBullets) {
+        this.dynamic.lineStyle(2, palette.shock, 0.45);
+        this.dynamic.lineBetween(bullet.prevX, bullet.prevY, bullet.x, bullet.y);
         this.dynamic.fillStyle(palette.shock, 1);
-        this.dynamic.fillCircle(bullet.x, bullet.y, 3.2);
+        this.dynamic.fillCircle(bullet.x, bullet.y, 3.4);
       }
 
       const ship = this.shipPosition();
-      if (this.firePad.active) {
-        const length = Math.hypot(this.firePad.x, this.firePad.y) || 1;
+      const aimGuide = this.firePad.active ? this.firePad : state.autoTarget;
+      if (aimGuide) {
+        const length = Math.hypot(aimGuide.x, aimGuide.y) || 1;
         this.dynamic.lineStyle(2, palette.shock, 0.38);
-        this.dynamic.lineBetween(ship.x, ship.y - 36, ship.x + (this.firePad.x / length) * 82, ship.y - 36 + (this.firePad.y / length) * 82);
+        this.dynamic.lineBetween(ship.x, ship.y - 36, ship.x + (aimGuide.x / length) * 82, ship.y - 36 + (aimGuide.y / length) * 82);
+      }
+      if (state.autoTarget && !this.firePad.active) {
+        this.dynamic.lineStyle(1.5, 0x7ef4ff, 0.26);
+        this.dynamic.strokeCircle(state.autoTarget.targetX, state.autoTarget.targetY, state.autoTarget.kind === "gun" ? 18 : 14);
       }
       this.dynamic.save();
       this.dynamic.translateCanvas(ship.x, ship.y);
-      for (let layer = 0; layer < state.armor; layer += 1) {
-        this.dynamic.lineStyle(3, [0x9bd5ff, 0xffcc4d, 0x5ee3a2][layer], 0.85);
+      const shieldColors = [0x9bd5ff, 0xffcc4d, 0x5ee3a2];
+      for (let layer = 0; layer < state.shieldHp.length; layer += 1) {
+        const hp = state.shieldHp[layer];
+        const color = shieldColors[layer];
+        const alpha = hp > 0 ? 0.28 + (hp / 3) * 0.55 : 0.18;
+        this.dynamic.lineStyle(3, color, alpha);
         this.dynamic.strokeRoundedRect(-28 - layer * 8, -45 - layer * 8, 56 + layer * 16, 90 + layer * 16, 18);
+        if (hp <= 0) {
+          this.dynamic.lineBetween(-22 - layer * 7, -28 - layer * 8, 18 + layer * 7, 24 + layer * 8);
+          this.dynamic.lineBetween(-18 - layer * 7, 30 + layer * 8, 24 + layer * 7, -18 - layer * 8);
+        }
+      }
+      this.dynamic.fillStyle(0x07131d, 0.82);
+      this.dynamic.fillRoundedRect(-62, -78, 124, 16, 7);
+      for (let layer = 0; layer < state.shieldHp.length; layer += 1) {
+        const hp = state.shieldHp[layer];
+        const color = shieldColors[layer];
+        const x = -58 + layer * 40;
+        this.dynamic.fillStyle(color, 0.16);
+        this.dynamic.fillRoundedRect(x, -74, 34, 8, 4);
+        if (hp > 0) {
+          this.dynamic.fillStyle(color, 0.92);
+          this.dynamic.fillRoundedRect(x, -74, 34 * (hp / 3), 8, 4);
+        }
+        this.dynamic.lineStyle(1, color, 0.42);
+        this.dynamic.strokeRoundedRect(x, -74, 34, 8, 4);
       }
       this.dynamic.fillStyle(0xd9e6ec, 1);
       this.dynamic.fillTriangle(0, -48, -26, 34, 26, 34);
@@ -1751,12 +1871,30 @@
 
     drawShipMotionLayer(state) {
       const offset = state.scroll % 118;
-      this.bg.lineStyle(2, 0xdff8ff, 0.2);
+      this.bg.lineStyle(2, 0xdff8ff, 0.24);
       this.bg.fillStyle(0xdff8ff, 0.08);
       for (let y = -120 + offset; y < WORLD.height + 140; y += 118) {
-        this.bg.strokeRoundedRect(384, y + 16, 28, 54, 12);
-        this.bg.strokeRoundedRect(548, y + 46, 22, 48, 10);
-        this.bg.fillRoundedRect(462, y + 74, 34, 6, 4);
+        this.bg.strokeRoundedRect(332, y + 18, 36, 56, 14);
+        this.bg.strokeRoundedRect(430, y + 6, 28, 62, 12);
+        this.bg.strokeRoundedRect(560, y + 42, 30, 54, 12);
+        this.bg.strokeRoundedRect(644, y + 12, 26, 48, 10);
+        this.bg.fillStyle(0x6de9ff, 0.14);
+        this.bg.fillRoundedRect(462, y + 74, 42, 7, 4);
+        this.bg.fillRoundedRect(386, y + 52, 28, 6, 4);
+      }
+
+      this.bg.lineStyle(2, 0xffffff, 0.16);
+      for (let y = -90 + (state.scroll % 86); y < WORLD.height + 120; y += 86) {
+        this.bg.beginPath();
+        this.bg.moveTo(302, y + 10);
+        this.bg.lineTo(342, y + 24);
+        this.bg.lineTo(384, y + 16);
+        this.bg.lineTo(430, y + 34);
+        this.bg.lineTo(486, y + 18);
+        this.bg.lineTo(548, y + 36);
+        this.bg.lineTo(602, y + 22);
+        this.bg.lineTo(660, y + 42);
+        this.bg.strokePath();
       }
 
       const bankMarks = [
@@ -2220,7 +2358,7 @@
     refreshHud(force) {
       let hud = "";
       if (this.mode === "ship") {
-        hud = `ship|${this.ship.levelIndex}|${Math.ceil(this.ship.timeLeft)}|${this.ship.armor}|${this.score}`;
+        hud = `ship|${this.ship.levelIndex}|${Math.ceil(this.ship.timeLeft)}|${this.ship.shieldHp.join("-")}|${this.ship.armor}|${this.score}`;
       } else if (this.mode === "heli") {
         const shields = this.heli.shields.map((shield) => (shield.alive ? "1" : "0")).join("");
         hud = `heli|${this.heli.levelIndex}|${Math.ceil(this.heli.timeLeft)}|${this.heli.armor}|${this.heli.weapon}|${Math.round(this.heli.heliX)}|${Math.round(this.heli.heliY)}|${shields}|${this.score}`;
@@ -2236,11 +2374,11 @@
       if (this.mode === "ship") {
         els.stageLabel.textContent = "Canal";
         els.targetsLabel.textContent = "Time";
-        els.podsLabel.textContent = "Armor";
+        els.podsLabel.textContent = "Shield";
         els.scoreLabel.textContent = "Score";
         els.stage.textContent = `C2 ${this.ship.levelIndex + 1}/${SHIP_LEVELS.length}`;
         els.targets.textContent = `${Math.ceil(this.ship.timeLeft)}s`;
-        els.pods.textContent = `${this.ship.armor}`;
+        els.pods.textContent = `${this.ship.shieldHp.join("/")}`;
         els.score.textContent = `${this.score}`;
       } else if (this.mode === "heli") {
         els.stageLabel.textContent = "Heli";
