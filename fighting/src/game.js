@@ -189,21 +189,21 @@
   ];
 
   const SHIP_LEVELS = [
-    { name: "Chapter 2-1", duration: 34, guns: 8, launchers: 2, mines: 5, bulletRate: 1.45, launcherRate: 4.3, riverSpeed: 76, pickupRate: 6.8 },
-    { name: "Chapter 2-2", duration: 42, guns: 10, launchers: 3, mines: 7, bulletRate: 1.15, launcherRate: 3.7, riverSpeed: 88, pickupRate: 5.9 },
-    { name: "Chapter 2-3", duration: 50, guns: 12, launchers: 4, mines: 9, bulletRate: 0.95, launcherRate: 3.1, riverSpeed: 102, pickupRate: 5.1 },
+    { name: "Chapter 2-1", duration: 34, guns: 8, launchers: 2, mines: 5, bulletRate: 1.45, launcherRate: 1.1, riverSpeed: 76, pickupRate: 6.8 },
+    { name: "Chapter 2-2", duration: 42, guns: 10, launchers: 3, mines: 7, bulletRate: 1.15, launcherRate: 1.0, riverSpeed: 88, pickupRate: 5.9 },
+    { name: "Chapter 2-3", duration: 50, guns: 12, launchers: 4, mines: 9, bulletRate: 0.95, launcherRate: 0.92, riverSpeed: 102, pickupRate: 5.1 },
   ];
 
   const SHIP_CENTER = { x: WORLD.width / 2, y: 316 };
   const SHIP_LIMITS = { left: 214, right: 746, top: 130, bottom: 472 };
   const SHIP_MOVE_SPEED = 224;
-  const SHIP_FIRE_RATE = 0.13;
+  const SHIP_FIRE_RATE = 0.22;
   const SHIP_BULLET_SPEED = 980;
   const SHIP_BULLET_LIFE = 2.25;
   const SHIP_SUPPORT_MISSILE_SPEED = 268;
   const SHIP_SUPPORT_MISSILE_FIRE_RATE = 0.58;
-  const SHIP_ENEMY_MISSILE_SPEED = 124;
-  const SHIP_ENEMY_MISSILE_TURN = 1.24;
+  const SHIP_ENEMY_MISSILE_SPEED = 108;
+  const SHIP_ENEMY_MISSILE_TURN = 1.05;
   const SHIP_BANK_WIDTH = 224;
   const SHIP_GUN_LEFT_X = 118;
   const SHIP_GUN_RIGHT_X = WORLD.width - SHIP_GUN_LEFT_X;
@@ -519,6 +519,11 @@
       this.keys = this.input.keyboard.addKeys("W,A,S,D,ONE,TWO");
       this.wireControls();
       this.input.on("pointerdown", (pointer) => this.handlePointer(pointer));
+      this.input.on("pointermove", (pointer) => {
+        if (pointer.isDown && this.mode === "ship") {
+          this.handlePointer(pointer);
+        }
+      });
       this.showBombingControls(true);
       this.refreshHud(true);
       this.showMessage("Chapter 1-1: one target, one pod");
@@ -1468,7 +1473,7 @@
       for (let i = 0; i < level.mines; i += 1) {
         this.ship.mines.push(this.createMine(-Phaser.Math.Between(40, 520)));
       }
-      this.showMessage(message || `${level.name}: survive the canal`);
+      this.showMessage(message || `${level.name}: manual fire, lucky items unlock auto support`);
       this.refreshHud(true);
     }
 
@@ -1482,7 +1487,17 @@
         alive: true,
         enemyAlive: true,
         enemyOffsetY: Phaser.Math.Between(-6, 10),
+        crew: this.createShipCrew(side),
       };
+    }
+
+    createShipCrew(side) {
+      const dir = side < 0 ? 1 : -1;
+      return [
+        { alive: true, offsetX: 14 * dir, offsetY: -17, pose: "crawl", scale: 0.22 },
+        { alive: true, offsetX: 40 * dir, offsetY: 8, pose: "standing", scale: 0.24 },
+        { alive: true, offsetX: 62 * dir, offsetY: -4, pose: "standing", scale: 0.21 },
+      ];
     }
 
     createShipLauncher(index, y) {
@@ -1492,7 +1507,7 @@
         side,
         y,
         alive: true,
-        cooldown: this.ship.level.launcherRate + Phaser.Math.FloatBetween(-0.6, 0.5),
+        cooldown: this.ship.level.launcherRate + Phaser.Math.FloatBetween(-0.18, 0.16),
       };
     }
 
@@ -1540,7 +1555,8 @@
       state.fireCooldown = Math.max(0, state.fireCooldown - dt);
       state.supportFireCooldown = Math.max(0, state.supportFireCooldown - dt);
       state.autoTarget = null;
-      const autoTargets = this.firePad.active ? [] : this.pickShipAutoTargets(ship);
+      const handsFree = this.shipHandsFreeActive();
+      const autoTargets = !this.firePad.active && handsFree ? this.pickShipAutoTargets(ship) : [];
       state.autoTarget = autoTargets[0] || null;
       if (state.fireCooldown <= 0) {
         if (this.firePad.active) {
@@ -1575,7 +1591,7 @@
           const x = this.shipGunX(gun);
           const y = gun.y;
           const angle = Math.atan2(ship.y - y, ship.x - x);
-          state.bullets.push({ x, y, vx: Math.cos(angle) * 185, vy: Math.sin(angle) * 185, life: 4 });
+          state.bullets.push({ x, y, vx: Math.cos(angle) * 168, vy: Math.sin(angle) * 168, life: 4 });
           gun.cooldown = state.level.bulletRate + Phaser.Math.FloatBetween(-0.25, 0.35);
         }
       }
@@ -1621,7 +1637,7 @@
             missile: true,
             hostile: true,
           });
-          launcher.cooldown = state.level.launcherRate + Phaser.Math.FloatBetween(-0.45, 0.55);
+          launcher.cooldown = state.level.launcherRate + Phaser.Math.FloatBetween(-0.14, 0.18);
         }
       }
 
@@ -1666,20 +1682,17 @@
           if (!gun.alive) {
             continue;
           }
-          const gunX = this.shipGunX(gun);
-          if (gun.enemyAlive) {
-            const enemy = this.shipEnemyPosition(gun);
-            if (pointSegmentDistance(enemy.x, enemy.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < 12) {
-              gun.enemyAlive = false;
+          for (const enemy of this.shipEnemyTargets(gun)) {
+            if (pointSegmentDistance(enemy.x, enemy.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < (enemy.slot === "main" ? 12 : 10)) {
               bullet.life = 0;
-              hitHazard = true;
-              state.score += 18;
-              this.score = state.score;
-              this.shipHitFx(enemy.x, enemy.y, palette.targetDone, 7, 0.58);
-              this.showMessage("Enemy down");
+              hitHazard = this.killShipEnemy(gun, enemy, enemy.slot === "main" ? 18 : 14, "Enemy down");
               break;
             }
           }
+          if (hitHazard) {
+            break;
+          }
+          const gunX = this.shipGunX(gun);
           if (pointSegmentDistance(gunX, gun.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < 42) {
             bullet.life = 0;
             hitHazard = this.killShipGun(gun, gunX, gun.y, 40, "Cannon disabled");
@@ -1713,10 +1726,10 @@
         bullet.y += bullet.vy * dt;
         bullet.life -= dt;
         const distance = Math.hypot(bullet.x - ship.x, bullet.y - ship.y);
-        if (distance < 15) {
+        if (distance < 14) {
           this.failShip("Controller hit");
           bullet.life = 0;
-        } else if (distance < 52) {
+        } else if (distance < 44) {
           if (state.armor > 0) {
             this.damageShipShield("Gun hit");
           } else {
@@ -1801,11 +1814,9 @@
               this.killShipGun(gun, target.x, target.y, 44, "Guided strike");
             }
           } else if (target.kind === "enemy") {
-            const gun = state.guns.find((item) => item.enemyAlive && Math.abs(this.shipEnemyPosition(item).x - target.x) < 2 && Math.abs(this.shipEnemyPosition(item).y - target.y) < 2);
+            const gun = state.guns.find((item) => item.id === target.gunId);
             if (gun) {
-              gun.enemyAlive = false;
-              state.score += 24;
-              this.score = state.score;
+              this.killShipEnemy(gun, { crewIndex: target.crewIndex, targetX: target.x, targetY: target.y }, target.crewIndex < 0 ? 24 : 20);
               this.shipBlast(target.x, target.y, 36, palette.shock, 10, 0.72);
             }
           } else if (target.kind === "mine") {
@@ -1844,11 +1855,11 @@
         missile.x += Math.cos(missile.angle) * missile.speed * dt;
         missile.y += Math.sin(missile.angle) * missile.speed * dt;
         const distance = Math.hypot(missile.x - ship.x, missile.y - ship.y);
-        if (distance < 18) {
+        if (distance < 16) {
           missile.dead = true;
           this.shipBlast(missile.x, missile.y, 44, palette.blast, 16, 1.08);
           this.failShip("Controller hit");
-        } else if (distance < 62) {
+        } else if (distance < 52) {
           missile.dead = true;
           this.shipBlast(missile.x, missile.y, 46, palette.blast, 16, 1.08);
           if (state.armor > 0) {
@@ -1908,6 +1919,34 @@
       };
     }
 
+    shipEnemyTargets(gun) {
+      const targets = [];
+      if (gun.enemyAlive) {
+        const enemy = this.shipEnemyPosition(gun);
+        targets.push({ slot: "main", crewIndex: -1, x: enemy.x, y: enemy.y, pose: "standing", scale: 0.28 });
+      }
+      if (gun.crew) {
+        gun.crew.forEach((crew, crewIndex) => {
+          if (!crew.alive) {
+            return;
+          }
+          targets.push({
+            slot: `crew-${crewIndex}`,
+            crewIndex,
+            x: this.shipGunX(gun) + crew.offsetX,
+            y: gun.y + crew.offsetY,
+            pose: crew.pose || "standing",
+            scale: crew.scale || 0.23,
+          });
+        });
+      }
+      return targets;
+    }
+
+    shipHandsFreeActive() {
+      return this.ship && (this.ship.dualUntil > this.elapsed || this.ship.guidedUntil > this.elapsed);
+    }
+
     shipShieldTotal() {
       return this.ship ? this.ship.shieldHp.reduce((sum, hp) => sum + hp, 0) : 0;
     }
@@ -1951,9 +1990,41 @@
       }
       gun.alive = false;
       gun.enemyAlive = false;
+      if (gun.crew) {
+        gun.crew.forEach((crew) => {
+          crew.alive = false;
+        });
+      }
       this.ship.score += score || 40;
       this.score = this.ship.score;
       this.shipBlast(x, y, 26, palette.blast, 10, 0.84);
+      if (message) {
+        this.showMessage(message);
+      }
+      return true;
+    }
+
+    killShipEnemy(gun, enemy, score, message) {
+      if (!gun || !enemy) {
+        return false;
+      }
+      if (enemy.crewIndex == null || enemy.crewIndex < 0) {
+        if (!gun.enemyAlive) {
+          return false;
+        }
+        gun.enemyAlive = false;
+      } else {
+        const crew = gun.crew && gun.crew[enemy.crewIndex];
+        if (!crew || !crew.alive) {
+          return false;
+        }
+        crew.alive = false;
+      }
+      const x = enemy.targetX ?? enemy.x;
+      const y = enemy.targetY ?? enemy.y;
+      this.ship.score += score || 18;
+      this.score = this.ship.score;
+      this.shipHitFx(x, y, palette.targetDone, 7, 0.58);
       if (message) {
         this.showMessage(message);
       }
@@ -1977,13 +2048,11 @@
         const gunX = this.shipGunX(gun);
         if (Math.hypot(gunX - x, gun.y - y) <= 118) {
           this.killShipGun(gun, gunX, gun.y, 24);
-        } else if (gun.enemyAlive) {
-          const enemy = this.shipEnemyPosition(gun);
-          if (Math.hypot(enemy.x - x, enemy.y - y) <= 122) {
-            gun.enemyAlive = false;
-            this.ship.score += 18;
-            this.score = this.ship.score;
-            this.shipHitFx(enemy.x, enemy.y, palette.targetDone, 6, 0.56);
+        } else {
+          for (const enemy of this.shipEnemyTargets(gun)) {
+            if (Math.hypot(enemy.x - x, enemy.y - y) <= 122) {
+              this.killShipEnemy(gun, enemy, enemy.slot === "main" ? 18 : 14);
+            }
           }
         }
       }
@@ -2006,7 +2075,7 @@
       }
       const fromY = ship.y - 36;
       const targets = [];
-      const consider = (kind, x, y, bias, alert) => {
+      const consider = (kind, x, y, bias, alert, extra) => {
         if (y < -28 || y > ship.y + 72 || x < 0 || x > WORLD.width) {
           return;
         }
@@ -2019,6 +2088,7 @@
           targetX: x,
           targetY: y,
           score,
+          ...(extra || {}),
         });
       };
 
@@ -2038,9 +2108,8 @@
           continue;
         }
         consider("gun", this.shipGunX(gun), gun.y, -140, 0);
-        if (gun.enemyAlive) {
-          const enemy = this.shipEnemyPosition(gun);
-          consider("enemy", enemy.x, enemy.y, -110, 0);
+        for (const enemy of this.shipEnemyTargets(gun)) {
+          consider("enemy", enemy.x, enemy.y, enemy.slot === "main" ? -110 : -94, 0, { gunId: gun.id, crewIndex: enemy.crewIndex });
         }
       }
       for (const mine of this.ship.mines) {
@@ -2068,9 +2137,8 @@
       for (const gun of this.ship.guns) {
         if (gun.alive) {
           hazards.push({ kind: "gun", x: this.shipGunX(gun), y: gun.y });
-          if (gun.enemyAlive) {
-            const enemy = this.shipEnemyPosition(gun);
-            hazards.push({ kind: "enemy", x: enemy.x, y: enemy.y });
+          for (const enemy of this.shipEnemyTargets(gun)) {
+            hazards.push({ kind: "enemy", x: enemy.x, y: enemy.y, gunId: gun.id, crewIndex: enemy.crewIndex });
           }
         }
       }
@@ -2265,9 +2333,8 @@
         this.map.fillRoundedRect(x - 14, gun.y - 12, 28, 24, 4);
         this.map.fillStyle(0x1a2026, 1);
         this.map.fillRect(x + (gun.side < 0 ? 8 : -28), gun.y - 3, 20, 6);
-        if (gun.enemyAlive) {
-          const enemy = this.shipEnemyPosition(gun);
-          drawEnemyFigure(this.map, enemy.x, enemy.y, palette.target, 1, 0.28, "standing", 1);
+        for (const enemy of this.shipEnemyTargets(gun)) {
+          drawEnemyFigure(this.map, enemy.x, enemy.y, palette.target, 1, enemy.scale, enemy.pose, 1);
         }
       }
 
@@ -2344,11 +2411,11 @@
 
       for (const shot of state.shots) {
         const alpha = clamp(shot.life / shot.maxLife, 0, 1);
-        const color = shot.missile ? palette.blast : palette.shock;
-        this.dynamic.lineStyle(shot.guided ? 3 : 2, color, alpha * 0.85);
+        const color = shot.hostile ? 0xff4f96 : shot.missile ? palette.blast : palette.shock;
+        this.dynamic.lineStyle(shot.guided || shot.hostile ? 3 : 2, color, alpha * 0.85);
         this.dynamic.lineBetween(shot.fromX, shot.fromY, shot.x, shot.y);
         this.dynamic.fillStyle(color, alpha);
-        this.dynamic.fillCircle(shot.x, shot.y, shot.guided ? 5 : 3);
+        this.dynamic.fillCircle(shot.x, shot.y, shot.guided || shot.hostile ? 5 : 3);
       }
 
       for (const bullet of state.playerBullets) {
@@ -2375,9 +2442,9 @@
 
       for (const missile of state.enemyMissiles) {
         const missileSize = missile.displaySize || missile.size || 10;
-        const hotColor = blendColor(0xffc94b, 0xff5a42, missile.danger || 0);
-        const bodyColor = blendColor(0xdde8ee, 0xffb16a, (missile.danger || 0) * 0.72);
-        const glowColor = blendColor(palette.shock, palette.blast, missile.danger || 0);
+        const hotColor = blendColor(0xff69b4, 0xff3f74, missile.danger || 0);
+        const bodyColor = blendColor(0x4b153a, 0xffb0d6, (missile.danger || 0) * 0.74);
+        const glowColor = blendColor(0xb33b74, 0xff4f96, missile.danger || 0);
         this.dynamic.save();
         this.dynamic.translateCanvas(missile.x, missile.y);
         this.dynamic.rotateCanvas(missile.angle);
@@ -2568,6 +2635,15 @@
     }
 
     handlePointer(pointer) {
+      if (this.mode === "ship") {
+        const state = this.ship;
+        if (!state || state.failed || state.finished || state.fireCooldown > 0) {
+          return;
+        }
+        const ship = this.shipPosition();
+        this.fireShipGun({ x: pointer.x - ship.x, y: pointer.y - (ship.y - 36) });
+        return;
+      }
       if (this.mode === "heli") {
         this.fireHeliWeapon(pointer.x, pointer.y);
       }
