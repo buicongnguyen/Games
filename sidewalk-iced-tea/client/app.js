@@ -16,6 +16,10 @@ const BASE_SPAWN_INTERVAL = 6.0;
 const SPAWN_VARIANCE = 1.5;
 const WEATHER_WINDOW = [45, 75];
 const RAIN_DURATION = 20;
+const WIND_WINDOW = [28, 52];
+const WIND_DURATION = 9;
+const DOG_WINDOW = [22, 38];
+const CAT_WINDOW = [26, 44];
 const TABLE_ROWS = 2;
 const TABLE_COLUMNS = 4;
 const BOARD_WIDTH = 960;
@@ -26,13 +30,139 @@ const DOOR_Y = 280;
 const AISLE_X = 236;
 
 const CUSTOMER_TYPES = [
-  { id: "man", assetId: "customer_man", label: "Man" },
-  { id: "woman", assetId: "customer_woman", label: "Woman" },
-  { id: "old_man", assetId: "customer_old_man", label: "Old man" },
-  { id: "old_woman", assetId: "customer_old_woman", label: "Old woman" },
-  { id: "young_boy", assetId: "customer_young_boy", label: "Young boy" },
-  { id: "young_girl", assetId: "customer_young_girl", label: "Young girl" },
+  {
+    id: "man",
+    assetId: "customer_man",
+    label: "Man",
+    skin: "#e8bc9a",
+    hair: "#2d211a",
+    top: "#6285d8",
+    bottom: "#4b3b32",
+    accent: "#cfddd4",
+    hairStyle: "short",
+    silhouette: "broad",
+  },
+  {
+    id: "woman",
+    assetId: "customer_woman",
+    label: "Woman",
+    skin: "#efc6a8",
+    hair: "#523124",
+    top: "#d86f7a",
+    bottom: "#6f4c83",
+    accent: "#f4d8cc",
+    hairStyle: "long",
+    silhouette: "soft",
+  },
+  {
+    id: "old_man",
+    assetId: "customer_old_man",
+    label: "Old man",
+    skin: "#e5b89a",
+    hair: "#d8d1cb",
+    top: "#7da1b8",
+    bottom: "#655447",
+    accent: "#eadcae",
+    hairStyle: "thin",
+    silhouette: "narrow",
+  },
+  {
+    id: "old_woman",
+    assetId: "customer_old_woman",
+    label: "Old woman",
+    skin: "#ebbf9f",
+    hair: "#cfd0d5",
+    top: "#6fa89f",
+    bottom: "#765a85",
+    accent: "#f2dbbd",
+    hairStyle: "bun",
+    silhouette: "soft",
+  },
+  {
+    id: "young_boy",
+    assetId: "customer_young_boy",
+    label: "Young boy",
+    skin: "#f0c69c",
+    hair: "#3f2617",
+    top: "#6da65f",
+    bottom: "#516cb4",
+    accent: "#f4d66c",
+    hairStyle: "cap",
+    silhouette: "compact",
+  },
+  {
+    id: "young_girl",
+    assetId: "customer_young_girl",
+    label: "Young girl",
+    skin: "#f2cba9",
+    hair: "#452819",
+    top: "#f0c15f",
+    bottom: "#d97872",
+    accent: "#8fc8d2",
+    hairStyle: "puff",
+    silhouette: "compact",
+  },
 ];
+
+const DRINK_TYPES = [
+  {
+    id: "thai_tea",
+    label: "Thai Tea",
+    shortLabel: "Thai",
+    liquid: "#d67e3d",
+    cup: "#ffe1af",
+    straw: "#f45a52",
+    garnish: "#f6d89c",
+  },
+  {
+    id: "lemon_tea",
+    label: "Lemon Tea",
+    shortLabel: "Lemon",
+    liquid: "#caa642",
+    cup: "#f5edd0",
+    straw: "#4fa06e",
+    garnish: "#f5e26d",
+  },
+  {
+    id: "peach_fizz",
+    label: "Peach Fizz",
+    shortLabel: "Peach",
+    liquid: "#ef9a7b",
+    cup: "#ffe8df",
+    straw: "#5db7d0",
+    garnish: "#f5c2ab",
+  },
+  {
+    id: "matcha_latte",
+    label: "Matcha Latte",
+    shortLabel: "Matcha",
+    liquid: "#84b06a",
+    cup: "#edf5e0",
+    straw: "#e5c657",
+    garnish: "#badc8f",
+  },
+  {
+    id: "berry_soda",
+    label: "Berry Soda",
+    shortLabel: "Berry",
+    liquid: "#9a64c0",
+    cup: "#f1e7ff",
+    straw: "#efb0d2",
+    garnish: "#d58eff",
+  },
+  {
+    id: "milk_tea",
+    label: "Milk Tea",
+    shortLabel: "Milk",
+    liquid: "#a66c46",
+    cup: "#f1d8b7",
+    straw: "#dd634f",
+    garnish: "#e7c39d",
+  },
+];
+
+const CUSTOMER_TYPE_BY_ID = new Map(CUSTOMER_TYPES.map((entry) => [entry.id, entry]));
+const DRINK_TYPE_BY_ID = new Map(DRINK_TYPES.map((entry) => [entry.id, entry]));
 
 const ASSET_PATHS = {
   bg_room: "./public/assets/placeholder/bg-room.svg",
@@ -55,6 +185,7 @@ const ui = {
   weatherValue: document.getElementById("weather-value"),
   tablesValue: document.getElementById("tables-value"),
   flowValue: document.getElementById("flow-value"),
+  incidentValue: document.getElementById("incident-value"),
   saveValue: document.getElementById("save-value"),
   sessionValue: document.getElementById("session-value"),
   titleOverlay: document.getElementById("title-overlay"),
@@ -193,6 +324,11 @@ function createDefaultState() {
     weatherState: "clear",
     weatherRemaining: 0,
     nextWeatherRollIn: randomInRange(...WEATHER_WINDOW),
+    windRemaining: 0,
+    nextWindRollIn: randomInRange(...WIND_WINDOW),
+    nextWandererId: 1,
+    nextDogRollIn: randomInRange(...DOG_WINDOW),
+    nextCatRollIn: randomInRange(...CAT_WINDOW),
     lastSavedAt: now,
     lastSimulatedAt: now,
     audioUnlocked: false,
@@ -208,8 +344,12 @@ function createDefaultState() {
       lastOutcome: null,
     })),
     customers: [],
+    wanderers: [],
     stats: {
       dropped: 0,
+      windEvents: 0,
+      dogVisits: 0,
+      catVisits: 0,
     },
   };
 }
@@ -234,6 +374,11 @@ function restoreState(saved) {
     weatherState: saved.weatherState === "rain" ? "rain" : "clear",
     weatherRemaining: asNumber(saved.weatherRemaining, base.weatherRemaining),
     nextWeatherRollIn: asNumber(saved.nextWeatherRollIn, base.nextWeatherRollIn),
+    windRemaining: asNumber(saved.windRemaining, base.windRemaining),
+    nextWindRollIn: asNumber(saved.nextWindRollIn, base.nextWindRollIn),
+    nextWandererId: asNumber(saved.nextWandererId, base.nextWandererId),
+    nextDogRollIn: asNumber(saved.nextDogRollIn, base.nextDogRollIn),
+    nextCatRollIn: asNumber(saved.nextCatRollIn, base.nextCatRollIn),
     lastSavedAt: asNumber(saved.lastSavedAt, base.lastSavedAt),
     lastSimulatedAt: Date.now(),
     audioUnlocked: Boolean(saved.audioUnlocked),
@@ -241,6 +386,9 @@ function restoreState(saved) {
     spawnTimer: asNumber(saved.spawnTimer, base.spawnTimer),
     stats: {
       dropped: asNumber(saved?.stats?.dropped, base.stats.dropped),
+      windEvents: asNumber(saved?.stats?.windEvents, base.stats.windEvents),
+      dogVisits: asNumber(saved?.stats?.dogVisits, base.stats.dogVisits),
+      catVisits: asNumber(saved?.stats?.catVisits, base.stats.catVisits),
     },
   };
 
@@ -265,6 +413,11 @@ function restoreState(saved) {
         .map((customer) => normalizeCustomer(customer))
         .filter(Boolean)
     : [];
+  restored.wanderers = Array.isArray(saved.wanderers)
+    ? saved.wanderers
+        .map((wanderer) => normalizeWanderer(wanderer))
+        .filter(Boolean)
+    : [];
 
   return restored;
 }
@@ -275,7 +428,7 @@ function normalizeCustomer(customer) {
   }
 
   const tableLayout = getTableLayout(customer.tableId);
-  const customerType = CUSTOMER_TYPES.find((entry) => entry.id === customer.type);
+  const customerType = getCustomerType(customer.type);
 
   if (!customerType || !tableLayout) {
     return null;
@@ -295,8 +448,32 @@ function normalizeCustomer(customer) {
     waitElapsed: asNumber(customer.waitElapsed, 0),
     serveElapsed: asNumber(customer.serveElapsed, 0),
     enjoyElapsed: asNumber(customer.enjoyElapsed, 0),
+    drinkId: getDrinkType(customer.drinkId)?.id ?? pickDrinkId(),
     rewardGranted: Boolean(customer.rewardGranted),
     tipReward: asNumber(customer.tipReward, 0),
+  };
+}
+
+function normalizeWanderer(wanderer) {
+  if (!wanderer || typeof wanderer !== "object") {
+    return null;
+  }
+
+  const kind = wanderer.kind === "dog" ? "dog" : wanderer.kind === "cat" ? "cat" : null;
+  if (!kind) {
+    return null;
+  }
+
+  return {
+    id: asNumber(wanderer.id, 0),
+    kind,
+    x: asNumber(wanderer.x, -40),
+    y: asNumber(wanderer.y, kind === "dog" ? 438 : 402),
+    targetX: asNumber(wanderer.targetX, BOARD_WIDTH + 40),
+    targetY: asNumber(wanderer.targetY, kind === "dog" ? 438 : 402),
+    waypoints: normalizePointList(wanderer.waypoints),
+    speed: asNumber(wanderer.speed, kind === "dog" ? 82 : 92),
+    facing: Number(wanderer.facing) < 0 ? -1 : 1,
   };
 }
 
@@ -453,6 +630,7 @@ function updateLogic(deltaSeconds) {
   gameState.lastSimulatedAt = Date.now();
 
   updateWeather(deltaSeconds);
+  updateStreetLife(deltaSeconds);
   updateSpawning(deltaSeconds);
   updateCustomers(deltaSeconds);
   syncTablesFromCustomers();
@@ -478,6 +656,111 @@ function updateWeather(deltaSeconds) {
     gameState.nextWeatherRollIn = randomInRange(...WEATHER_WINDOW);
     runtime.audio.beep("rain");
     showToast(gameState.umbrellaOwned ? "Light rain. Umbrella is helping." : "Rain cut the foot traffic.");
+  }
+}
+
+function updateStreetLife(deltaSeconds) {
+  updateWind(deltaSeconds);
+  updateWandererTimers(deltaSeconds);
+  updateWanderers(deltaSeconds);
+}
+
+function updateWind(deltaSeconds) {
+  if (gameState.windRemaining > 0) {
+    gameState.windRemaining = Math.max(0, gameState.windRemaining - deltaSeconds);
+    if (gameState.windRemaining <= 0) {
+      showToast("The strong wind settled down.");
+    }
+    return;
+  }
+
+  gameState.nextWindRollIn -= deltaSeconds;
+  if (gameState.nextWindRollIn <= 0) {
+    startWindEvent();
+  }
+}
+
+function startWindEvent() {
+  gameState.windRemaining = WIND_DURATION;
+  gameState.nextWindRollIn = randomInRange(...WIND_WINDOW);
+  gameState.stats.windEvents += 1;
+  runtime.audio.beep("rain");
+  showToast("Strong wind is sweeping past the stall.");
+}
+
+function updateWandererTimers(deltaSeconds) {
+  if (!hasWanderer("dog")) {
+    gameState.nextDogRollIn -= deltaSeconds;
+    if (gameState.nextDogRollIn <= 0) {
+      spawnWanderer("dog");
+      gameState.nextDogRollIn = randomInRange(...DOG_WINDOW);
+    }
+  }
+
+  if (!hasWanderer("cat")) {
+    gameState.nextCatRollIn -= deltaSeconds;
+    if (gameState.nextCatRollIn <= 0) {
+      spawnWanderer("cat");
+      gameState.nextCatRollIn = randomInRange(...CAT_WINDOW);
+    }
+  }
+}
+
+function spawnWanderer(kind) {
+  const fromLeft = Math.random() < 0.5;
+  const entryX = fromLeft ? -48 : BOARD_WIDTH + 48;
+  const exitX = fromLeft ? BOARD_WIDTH + 48 : -48;
+  const laneY = kind === "dog" ? randomInRange(404, 448) : randomInRange(368, 420);
+  const midX = fromLeft
+    ? randomInRange(180, 420)
+    : randomInRange(BOARD_WIDTH - 420, BOARD_WIDTH - 180);
+  const secondX = fromLeft
+    ? randomInRange(BOARD_WIDTH - 300, BOARD_WIDTH - 120)
+    : randomInRange(120, 300);
+  const wanderer = {
+    id: gameState.nextWandererId,
+    kind,
+    x: entryX,
+    y: laneY,
+    targetX: exitX,
+    targetY: laneY,
+    waypoints: [
+      { x: midX, y: laneY + randomInRange(-14, 14) },
+      { x: secondX, y: laneY + randomInRange(-10, 10) },
+      { x: exitX, y: laneY + randomInRange(-4, 4) },
+    ],
+    speed: kind === "dog" ? 84 : 96,
+    facing: fromLeft ? 1 : -1,
+  };
+
+  gameState.nextWandererId += 1;
+  gameState.wanderers.push(wanderer);
+
+  if (kind === "dog") {
+    gameState.stats.dogVisits += 1;
+    showToast("A dog is wandering past the shop.");
+  } else {
+    gameState.stats.catVisits += 1;
+    showToast("A cat slipped into the patio lane.");
+  }
+}
+
+function hasWanderer(kind) {
+  return gameState.wanderers.some((wanderer) => wanderer.kind === kind);
+}
+
+function updateWanderers(deltaSeconds) {
+  const toRemove = new Set();
+
+  for (const wanderer of gameState.wanderers) {
+    const reachedExit = moveAlongWaypoints(wanderer, deltaSeconds);
+    if (reachedExit) {
+      toRemove.add(wanderer.id);
+    }
+  }
+
+  if (toRemove.size > 0) {
+    gameState.wanderers = gameState.wanderers.filter((wanderer) => !toRemove.has(wanderer.id));
   }
 }
 
@@ -511,7 +794,11 @@ function updateCustomers(deltaSeconds) {
     }
 
     if (customer.phase === "walking_to_table") {
-      const reachedSeat = moveAlongWaypoints(customer, deltaSeconds);
+      const reachedSeat = moveAlongWaypoints(
+        customer,
+        deltaSeconds,
+        currentWalkSpeedMultiplier(),
+      );
       if (reachedSeat) {
         customer.phase = "waiting";
         customer.x = tableLayout.seatX;
@@ -563,7 +850,11 @@ function updateCustomers(deltaSeconds) {
     }
 
     if (customer.phase === "walking_out") {
-      const reachedDoor = moveAlongWaypoints(customer, deltaSeconds);
+      const reachedDoor = moveAlongWaypoints(
+        customer,
+        deltaSeconds,
+        currentWalkSpeedMultiplier(),
+      );
       if (reachedDoor) {
         customersToRemove.add(customer.id);
       }
@@ -643,6 +934,7 @@ function spawnCustomer() {
   const customer = {
     id: customerId,
     type: customerType.id,
+    drinkId: pickDrinkId(),
     phase: "walking_to_table",
     x: DOOR_OUTSIDE_X,
     y: DOOR_Y,
@@ -683,6 +975,7 @@ function beginExit(customer, table) {
 function finishService(customer, table) {
   const waitTime = customer.waitElapsed;
   const tableLayout = getTableLayout(customer.tableId);
+  const drink = getDrinkType(customer.drinkId);
   let scoreGain = 0;
   let tipGain = 0;
 
@@ -715,8 +1008,8 @@ function finishService(customer, table) {
 
   const toastMessage =
     tipGain > 0
-      ? `${customerLabel(customer.type)} tipped you for quick service.`
-      : `${customerLabel(customer.type)} got served.`;
+      ? `${customerLabel(customer.type)} loved the ${drink?.label ?? "drink"} and tipped you.`
+      : `${customerLabel(customer.type)} got their ${drink?.label ?? "drink"}.`;
   showToast(toastMessage);
 }
 
@@ -762,6 +1055,7 @@ function handleCanvasPointer(event) {
   table.status = "serving";
   table.serviceElapsed = 0;
   runtime.audio.beep("tap");
+  showToast(`Pouring ${getDrinkType(customer.drinkId)?.label ?? "iced tea"} now.`);
 }
 
 function getCanvasPoint(event) {
@@ -923,6 +1217,7 @@ function applyResumeSimulation(elapsedSeconds) {
     while (remaining > 0) {
       const step = Math.min(FIXED_STEP, remaining);
       updateWeather(step);
+      updateStreetLife(step);
       updateSpawning(step);
       updateCustomers(step);
       syncTablesFromCustomers();
@@ -950,11 +1245,16 @@ function renderScene(timestamp) {
   ctx.clearRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
   drawRoom();
   drawTables();
+  drawWanderers(timestamp);
   drawCustomers(timestamp);
   drawFloatingTexts();
 
   if (gameState.weatherState === "rain") {
     drawRainOverlay(timestamp);
+  }
+
+  if (gameState.windRemaining > 0) {
+    drawWindOverlay(timestamp);
   }
 
   if (runtime.mode === "paused") {
@@ -965,54 +1265,127 @@ function renderScene(timestamp) {
 }
 
 function drawRoom() {
-  ctx.fillStyle = "#3a2216";
+  const wallGradient = ctx.createLinearGradient(0, 0, 0, BOARD_HEIGHT);
+  wallGradient.addColorStop(0, "#f6dfb1");
+  wallGradient.addColorStop(0.55, "#d9a46f");
+  wallGradient.addColorStop(1, "#7f4a2d");
+  ctx.fillStyle = wallGradient;
   ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
-  const bgImage = runtime.assets.get("bg_room");
-  if (bgImage) {
-    ctx.drawImage(bgImage, 0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+  ctx.fillStyle = "#8290a3";
+  ctx.fillRect(0, 290, 176, BOARD_HEIGHT - 290);
+  ctx.fillStyle = "#a3afbe";
+  ctx.fillRect(0, 320, 176, 14);
+  ctx.fillStyle = "#5a6170";
+  ctx.fillRect(0, 334, 176, BOARD_HEIGHT - 334);
+
+  ctx.fillStyle = "#ebd4a8";
+  ctx.fillRect(176, 88, BOARD_WIDTH - 176, 92);
+
+  ctx.fillStyle = "#9a6a44";
+  ctx.fillRect(176, 180, BOARD_WIDTH - 176, BOARD_HEIGHT - 180);
+
+  ctx.strokeStyle = "rgba(255, 234, 202, 0.12)";
+  ctx.lineWidth = 1;
+  for (let x = 190; x < BOARD_WIDTH; x += 42) {
+    ctx.beginPath();
+    ctx.moveTo(x, 180);
+    ctx.lineTo(x, BOARD_HEIGHT);
+    ctx.stroke();
+  }
+  for (let y = 202; y < BOARD_HEIGHT; y += 34) {
+    ctx.beginPath();
+    ctx.moveTo(176, y);
+    ctx.lineTo(BOARD_WIDTH, y);
+    ctx.stroke();
   }
 
-  ctx.fillStyle = "#4c3020";
-  ctx.fillRect(42, 90, 44, 190);
-  ctx.fillStyle = "#26140c";
-  ctx.fillRect(54, 116, 26, 138);
-  ctx.fillStyle = "#f8d36b";
-  ctx.fillRect(58, 182, 8, 8);
+  ctx.fillStyle = "#4b2918";
+  ctx.fillRect(38, 102, 54, 196);
+  ctx.fillStyle = "#1f130c";
+  roundedRectPath(ctx, 50, 118, 30, 156, 12);
+  ctx.fill();
+  ctx.fillStyle = "#ffd77b";
+  roundedRectPath(ctx, 69, 188, 8, 10, 4);
+  ctx.fill();
 
-  ctx.fillStyle = "rgba(250, 232, 193, 0.18)";
-  ctx.fillRect(96, 252, 144, 56);
-  ctx.fillRect(224, 128, 38, 280);
+  ctx.fillStyle = "rgba(252, 244, 213, 0.22)";
+  ctx.fillRect(102, 248, 142, 60);
+  ctx.fillRect(224, 116, 36, 304);
 
-  ctx.fillStyle = "#ffe9b6";
-  ctx.font = '700 22px "Trebuchet MS", sans-serif';
-  ctx.fillText("Door", 34, 308);
+  ctx.fillStyle = "#6c3e23";
+  roundedRectPath(ctx, 102, 70, 198, 120, 26);
+  ctx.fill();
+  ctx.fillStyle = "#8f5630";
+  roundedRectPath(ctx, 114, 82, 174, 98, 22);
+  ctx.fill();
+  ctx.fillStyle = "#fff4d2";
+  roundedRectPath(ctx, 132, 96, 138, 42, 14);
+  ctx.fill();
+  ctx.fillStyle = "#734125";
+  ctx.font = '700 15px "Trebuchet MS", sans-serif';
+  ctx.fillText("MENU", 184, 121);
+  ctx.fillStyle = "#5e341e";
+  ctx.font = '600 12px "Trebuchet MS", sans-serif';
+  ctx.fillText("Tea  Lemon  Matcha", 132, 143);
+  ctx.fillText("Berry  Peach  Milk", 134, 160);
 
-  const counterImage = runtime.assets.get("stall_counter");
-  if (counterImage) {
-    ctx.drawImage(counterImage, 110, 72, 184, 110);
+  ctx.fillStyle = "#d46f45";
+  roundedRectPath(ctx, 88, 54, 226, 28, 10);
+  ctx.fill();
+  ctx.fillStyle = "#f6d59a";
+  for (let stripe = 0; stripe < 6; stripe += 1) {
+    ctx.fillRect(100 + stripe * 34, 54, 18, 28);
   }
 
-  ctx.fillStyle = "#fff7e1";
+  ctx.fillStyle = "#f3dfb4";
   ctx.font = '700 24px "Trebuchet MS", sans-serif';
-  ctx.fillText("Tea Counter", 112, 205);
+  ctx.fillText("Tea Counter", 116, 210);
+  ctx.font = '700 20px "Trebuchet MS", sans-serif';
+  ctx.fillText("Door", 26, 322);
+
+  drawStringLights();
+  drawCounterDisplay();
+  drawPlant(146, 320, 1.1);
+  drawPlant(270, 232, 0.85);
 }
 
 function drawTables() {
-  const tableImage = runtime.assets.get("table_slot");
-
   for (const layout of TABLE_LAYOUT) {
     const table = getTableState(layout.id);
+    const customer = table?.customerId
+      ? gameState.customers.find((entry) => entry.id === table.customerId)
+      : null;
 
     ctx.save();
-    if (tableImage) {
-      ctx.drawImage(tableImage, layout.x, layout.y, layout.width, layout.height);
-    } else {
-      ctx.fillStyle = "#7c5333";
-      ctx.fillRect(layout.x, layout.y, layout.width, layout.height);
-    }
-
+    ctx.fillStyle = "rgba(39, 20, 11, 0.22)";
+    ctx.beginPath();
+    ctx.ellipse(
+      layout.x + layout.width / 2,
+      layout.y + layout.height / 2 + 26,
+      54,
+      16,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    ctx.fillStyle = "#5e3922";
+    roundedRectPath(ctx, layout.x + 16, layout.y + 70, layout.width - 32, 18, 8);
+    ctx.fill();
+    ctx.fillStyle = "#6b4028";
+    roundedRectPath(ctx, layout.x + 42, layout.y + 24, 14, 52, 6);
+    ctx.fill();
+    roundedRectPath(ctx, layout.x + layout.width - 56, layout.y + 24, 14, 52, 6);
+    ctx.fill();
+    ctx.fillStyle = "#8d5b37";
+    roundedRectPath(ctx, layout.x + 8, layout.y + 10, layout.width - 16, 56, 18);
+    ctx.fill();
+    ctx.fillStyle = "#aa744a";
+    roundedRectPath(ctx, layout.x + 14, layout.y + 16, layout.width - 28, 22, 10);
+    ctx.fill();
     drawTableStatusHalo(layout, table);
+    drawTableDrinkMarker(layout, customer);
     drawTableLabel(layout);
     drawTableTimer(layout, table);
     drawServeHint(layout, table);
@@ -1043,7 +1416,7 @@ function drawTableStatusHalo(layout, table) {
 }
 
 function drawTableLabel(layout) {
-  ctx.fillStyle = "#3d2414";
+  ctx.fillStyle = "#472a19";
   ctx.font = '700 16px "Trebuchet MS", sans-serif';
   ctx.fillText(`T${layout.index + 1}`, layout.x + 10, layout.y + 18);
 }
@@ -1103,6 +1476,19 @@ function drawServeHint(layout, table) {
   ctx.moveTo(centerX, centerY - 6);
   ctx.lineTo(centerX, centerY + 6);
   ctx.stroke();
+  const customer = table.customerId
+    ? gameState.customers.find((entry) => entry.id === table.customerId)
+    : null;
+  const drink = customer ? getDrinkType(customer.drinkId) : null;
+  if (drink) {
+    ctx.fillStyle = "rgba(255, 247, 226, 0.95)";
+    roundedRectPath(ctx, centerX - 28, centerY + 20, 56, 20, 10);
+    ctx.fill();
+    ctx.fillStyle = "#60351d";
+    ctx.font = '700 11px "Trebuchet MS", sans-serif';
+    ctx.textAlign = "center";
+    ctx.fillText(drink.shortLabel, centerX, centerY + 34);
+  }
   ctx.restore();
 }
 
@@ -1110,32 +1496,40 @@ function drawCustomers(timestamp) {
   const sorted = [...gameState.customers].sort((left, right) => left.y - right.y);
 
   for (const customer of sorted) {
-    const assetKey = CUSTOMER_TYPES.find((entry) => entry.id === customer.type)?.assetId;
-    const image = assetKey ? runtime.assets.get(assetKey) : null;
-    const bob = Math.sin((timestamp / 180) + customer.id) * 1.5;
-    const drawX = Math.round(customer.x - 28);
-    const drawY = Math.round(customer.y - 72 + bob);
-
-    ctx.save();
-    ctx.fillStyle = "rgba(30, 18, 10, 0.24)";
-    ctx.beginPath();
-    ctx.ellipse(customer.x, customer.y + 2, 18, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    if (image) {
-      ctx.drawImage(image, drawX, drawY, 56, 72);
-    } else {
-      ctx.fillStyle = "#f5cab0";
-      ctx.fillRect(drawX + 16, drawY + 12, 24, 18);
-      ctx.fillStyle = "#5277a5";
-      ctx.fillRect(drawX + 12, drawY + 30, 32, 24);
+    const style = getCustomerType(customer.type);
+    const drink = getDrinkType(customer.drinkId);
+    if (!style || !drink) {
+      continue;
     }
 
-    if (customer.phase === "waiting") {
-      ctx.fillStyle = "#fff6de";
-      ctx.font = '700 12px "Trebuchet MS", sans-serif';
-      ctx.textAlign = "center";
-      ctx.fillText(customerLabel(customer.type), customer.x, drawY - 4);
+    const walking = customer.phase === "walking_to_table" || customer.phase === "walking_out";
+    const bob = Math.sin((timestamp / 150) + customer.id) * (walking ? 1.6 : 0.7);
+    const baseY = customer.y + bob;
+
+    drawCharacterShadow(customer.x, baseY, walking ? 17 : 15);
+    drawCustomerFigure(customer, style, drink, timestamp, baseY);
+    drawCustomerStageDecor(customer, drink, timestamp, baseY);
+  }
+}
+
+function drawWanderers(timestamp) {
+  const sorted = [...gameState.wanderers].sort((left, right) => left.y - right.y);
+
+  for (const wanderer of sorted) {
+    const bob = Math.sin((timestamp / 180) + wanderer.id * 0.7) * 0.8;
+    const baseY = wanderer.y + bob;
+
+    drawCharacterShadow(wanderer.x, baseY + 2, wanderer.kind === "dog" ? 20 : 18);
+    ctx.save();
+    ctx.translate(wanderer.x, baseY);
+    if (wanderer.facing < 0) {
+      ctx.scale(-1, 1);
+    }
+
+    if (wanderer.kind === "dog") {
+      drawDog();
+    } else {
+      drawCat();
     }
     ctx.restore();
   }
@@ -1160,14 +1554,52 @@ function drawRainOverlay(timestamp) {
 
   ctx.strokeStyle = "rgba(222, 244, 255, 0.44)";
   ctx.lineWidth = 2;
+  const windTilt = gameState.windRemaining > 0 ? 12 : 0;
 
   for (let index = 0; index < 44; index += 1) {
     const x = (index * 34 + (timestamp / 3)) % (BOARD_WIDTH + 40);
     const y = ((index * 21) + (timestamp / 7)) % (BOARD_HEIGHT + 60);
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x - 8, y + 16);
+    ctx.lineTo(x - 8 - windTilt, y + 16);
     ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawWindOverlay(timestamp) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 245, 211, 0.34)";
+  ctx.lineWidth = 3;
+
+  for (let index = 0; index < 16; index += 1) {
+    const originX = ((timestamp / 2) + index * 78) % (BOARD_WIDTH + 160) - 80;
+    const originY = 110 + ((index * 29) % 310);
+    ctx.beginPath();
+    ctx.moveTo(originX, originY);
+    ctx.bezierCurveTo(
+      originX + 26,
+      originY - 8,
+      originX + 58,
+      originY + 8,
+      originX + 86,
+      originY - 2,
+    );
+    ctx.stroke();
+  }
+
+  for (let leaf = 0; leaf < 12; leaf += 1) {
+    const x = ((timestamp / 1.6) + leaf * 96) % (BOARD_WIDTH + 200) - 100;
+    const y = 100 + ((leaf * 37) % 320);
+    const rotation = (timestamp / 180) + leaf;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    ctx.fillStyle = leaf % 2 === 0 ? "#d2b45f" : "#9ec46b";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 8, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
   ctx.restore();
 }
@@ -1204,6 +1636,7 @@ function updateHud() {
       : "clear";
   ui.tablesValue.textContent = `${busyTables} / ${TABLE_LAYOUT.length}`;
   ui.flowValue.textContent = `${gameState.totalServed} served / ${gameState.totalMissed} missed`;
+  ui.incidentValue.textContent = currentIncidentLabel();
   ui.saveValue.textContent = runtime.saveStatus;
   ui.sessionValue.textContent = formatElapsed(Date.now() - runtime.sessionStartedAt);
   ui.pauseButton.innerHTML =
@@ -1232,7 +1665,7 @@ function updateOverlay() {
     ui.startButton.textContent =
       gameState.totalServed > 0 || gameState.coins > 0 ? "Continue Stall" : "Open Stall";
     ui.overlayCopy.textContent =
-      "Tap a table to serve before the countdown hits zero. Quick service earns points and possible tips.";
+      "Tap tables before the wait timer runs out. Orders now vary by drink, and the street can shift with rain, wind, cats, and dogs.";
     return;
   }
 
@@ -1268,7 +1701,7 @@ function showToast(message) {
   runtime.toastUntil = performance.now() + 2200;
 }
 
-function moveEntityToward(entity, targetX, targetY, deltaSeconds) {
+function moveEntityToward(entity, targetX, targetY, deltaSeconds, speedMultiplier = 1) {
   const dx = targetX - entity.x;
   const dy = targetY - entity.y;
   const distance = Math.hypot(dx, dy);
@@ -1279,7 +1712,7 @@ function moveEntityToward(entity, targetX, targetY, deltaSeconds) {
     return true;
   }
 
-  const maxStep = entity.speed * deltaSeconds;
+  const maxStep = entity.speed * deltaSeconds * speedMultiplier;
   if (distance <= maxStep) {
     entity.x = targetX;
     entity.y = targetY;
@@ -1291,13 +1724,19 @@ function moveEntityToward(entity, targetX, targetY, deltaSeconds) {
   return false;
 }
 
-function moveAlongWaypoints(entity, deltaSeconds) {
+function moveAlongWaypoints(entity, deltaSeconds, speedMultiplier = 1) {
   if (!Array.isArray(entity.waypoints) || entity.waypoints.length === 0) {
-    return moveEntityToward(entity, entity.targetX, entity.targetY, deltaSeconds);
+    return moveEntityToward(entity, entity.targetX, entity.targetY, deltaSeconds, speedMultiplier);
   }
 
   const currentWaypoint = entity.waypoints[0];
-  const reached = moveEntityToward(entity, currentWaypoint.x, currentWaypoint.y, deltaSeconds);
+  const reached = moveEntityToward(
+    entity,
+    currentWaypoint.x,
+    currentWaypoint.y,
+    deltaSeconds,
+    speedMultiplier,
+  );
 
   if (!reached) {
     return false;
@@ -1319,6 +1758,22 @@ function getTableLayout(id) {
 
 function getTableState(id) {
   return gameState.tables.find((table) => table.id === id) ?? null;
+}
+
+function getCustomerType(typeId) {
+  return CUSTOMER_TYPE_BY_ID.get(typeId) ?? null;
+}
+
+function getDrinkType(drinkId) {
+  return DRINK_TYPE_BY_ID.get(drinkId) ?? null;
+}
+
+function pickDrinkId() {
+  return DRINK_TYPES[Math.floor(Math.random() * DRINK_TYPES.length)].id;
+}
+
+function currentWalkSpeedMultiplier() {
+  return gameState.windRemaining > 0 ? 0.82 : 1;
 }
 
 function findFreeTableLayout() {
@@ -1367,7 +1822,22 @@ function asNumber(value, fallback) {
 }
 
 function customerLabel(type) {
-  return CUSTOMER_TYPES.find((entry) => entry.id === type)?.label ?? "Customer";
+  return getCustomerType(type)?.label ?? "Customer";
+}
+
+function currentIncidentLabel() {
+  const pieces = [];
+  if (gameState.windRemaining > 0) {
+    pieces.push("wind");
+  }
+  if (hasWanderer("dog")) {
+    pieces.push("dog");
+  }
+  if (hasWanderer("cat")) {
+    pieces.push("cat");
+  }
+
+  return pieces.length > 0 ? pieces.join(" / ") : "quiet street";
 }
 
 function parseSaveSource(primaryRaw, backupRaw) {
@@ -1406,11 +1876,20 @@ function buildExitWaypoints(tableLayout) {
   ];
 }
 
+function normalizePointList(points) {
+  if (!Array.isArray(points) || points.length === 0) {
+    return [];
+  }
+
+  return points
+    .filter((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y))
+    .map((point) => ({ x: Number(point.x), y: Number(point.y) }));
+}
+
 function normalizeWaypoints(waypoints, tableLayout, phase) {
-  if (Array.isArray(waypoints) && waypoints.length > 0) {
-    return waypoints
-      .filter((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y))
-      .map((point) => ({ x: Number(point.x), y: Number(point.y) }));
+  const normalized = normalizePointList(waypoints);
+  if (normalized.length > 0) {
+    return normalized;
   }
 
   if (phase === "walking_out") {
@@ -1444,6 +1923,436 @@ function updateFloatingTexts(deltaSeconds) {
     .filter((item) => item.age < item.lifetime);
 }
 
+function roundedRectPath(context, x, y, width, height, radius) {
+  const safeRadius = Math.max(0, Math.min(radius, width / 2, height / 2));
+  context.beginPath();
+  context.moveTo(x + safeRadius, y);
+  context.lineTo(x + width - safeRadius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+  context.lineTo(x + width, y + height - safeRadius);
+  context.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+  context.lineTo(x + safeRadius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+  context.lineTo(x, y + safeRadius);
+  context.quadraticCurveTo(x, y, x + safeRadius, y);
+  context.closePath();
+}
+
+function drawStringLights() {
+  ctx.save();
+  ctx.strokeStyle = "rgba(97, 57, 30, 0.45)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(160, 96);
+  ctx.quadraticCurveTo(328, 44, 480, 90);
+  ctx.quadraticCurveTo(648, 140, 812, 96);
+  ctx.stroke();
+
+  for (let bulb = 0; bulb < 10; bulb += 1) {
+    const x = 176 + bulb * 70;
+    const y = 90 + Math.sin(bulb * 0.85) * 11;
+    ctx.strokeStyle = "rgba(97, 57, 30, 0.45)";
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y + 10);
+    ctx.stroke();
+    ctx.fillStyle = bulb % 2 === 0 ? "#ffe389" : "#f6d2a2";
+    ctx.beginPath();
+    ctx.ellipse(x, y + 14, 5, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawCounterDisplay() {
+  ctx.save();
+  ctx.fillStyle = "#77462a";
+  roundedRectPath(ctx, 110, 214, 162, 86, 18);
+  ctx.fill();
+  ctx.fillStyle = "#cc8c58";
+  roundedRectPath(ctx, 122, 226, 138, 28, 12);
+  ctx.fill();
+  ctx.fillStyle = "rgba(240, 248, 255, 0.16)";
+  roundedRectPath(ctx, 122, 232, 138, 48, 12);
+  ctx.fill();
+
+  const displayDrinks = [DRINK_TYPES[0], DRINK_TYPES[3], DRINK_TYPES[4]];
+  displayDrinks.forEach((drink, index) => {
+    drawDrinkGlass(drink, 146 + index * 36, 274, 0.78);
+  });
+
+  ctx.fillStyle = "#f6ddbb";
+  roundedRectPath(ctx, 174, 246, 46, 12, 6);
+  ctx.fill();
+  ctx.fillStyle = "#6c3e23";
+  ctx.font = '700 10px "Trebuchet MS", sans-serif';
+  ctx.textAlign = "center";
+  ctx.fillText("best sellers", 197, 255);
+  ctx.restore();
+}
+
+function drawPlant(x, y, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#8d5d34";
+  roundedRectPath(ctx, -18, -12, 36, 26, 10);
+  ctx.fill();
+  ctx.fillStyle = "#6fa35e";
+  for (let index = 0; index < 5; index += 1) {
+    ctx.beginPath();
+    ctx.ellipse(-10 + index * 5, -18 - (index % 2) * 7, 9, 16, index * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawTableDrinkMarker(layout, customer) {
+  if (!customer) {
+    return;
+  }
+
+  const drink = getDrinkType(customer.drinkId);
+  if (!drink) {
+    return;
+  }
+
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 245, 221, 0.96)";
+  roundedRectPath(ctx, layout.x + layout.width - 52, layout.y + 8, 40, 18, 8);
+  ctx.fill();
+  ctx.fillStyle = "#61361d";
+  ctx.textAlign = "center";
+  ctx.font = '700 10px "Trebuchet MS", sans-serif';
+  ctx.fillText(drink.shortLabel, layout.x + layout.width - 32, layout.y + 20);
+
+  if (customer.phase === "being_served" || customer.phase === "enjoying") {
+    drawDrinkGlass(drink, layout.x + layout.width - 28, layout.y + 56, 0.72);
+  }
+  ctx.restore();
+}
+
+function drawCharacterShadow(x, y, width) {
+  ctx.save();
+  ctx.fillStyle = "rgba(30, 18, 10, 0.24)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2, width, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCustomerFigure(customer, style, drink, timestamp, baseY) {
+  const walking = customer.phase === "walking_to_table" || customer.phase === "walking_out";
+  const seated = !walking;
+  const serving = customer.phase === "being_served";
+  const enjoying = customer.phase === "enjoying";
+  const direction = walking ? getFacingDirection(customer) : 1;
+  const stride = walking ? Math.sin((timestamp / 95) + customer.id) * 0.42 : 0;
+  const backStride = walking ? -stride : seated ? -0.2 : 0;
+  const frontStride = walking ? stride : seated ? 0.28 : 0;
+  const armSwing = walking ? stride * 0.7 : 0;
+  const torsoWidth = style.silhouette === "broad" ? 25 : style.silhouette === "compact" ? 20 : 22;
+  const torsoHeight = style.silhouette === "compact" ? 22 : 24;
+  const legTopY = seated ? -24 : -34;
+  const legLength = seated ? 24 : 34;
+  const shoulderY = legTopY - torsoHeight + 5;
+  const headY = shoulderY - 17;
+
+  ctx.save();
+  ctx.translate(customer.x, baseY);
+  if (direction < 0) {
+    ctx.scale(-1, 1);
+  }
+
+  drawLimbSegment(-6, legTopY, 8, legLength, backStride, style.bottom);
+  drawLimbSegment(6, legTopY, 8, legLength, frontStride, style.bottom);
+
+  ctx.fillStyle = "#f7f0e6";
+  ctx.beginPath();
+  ctx.ellipse(-7 + backStride * 8, 0, 6, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(7 + frontStride * 8, 0, 6, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  drawLimbSegment(
+    -torsoWidth / 2 - 4,
+    shoulderY,
+    7,
+    20,
+    serving ? -0.55 : -0.28 - armSwing,
+    style.skin,
+  );
+  drawLimbSegment(
+    torsoWidth / 2 + 4,
+    shoulderY,
+    7,
+    20,
+    enjoying ? -0.85 : serving ? -1.05 : 0.32 + armSwing,
+    style.skin,
+  );
+
+  ctx.fillStyle = style.top;
+  roundedRectPath(ctx, -torsoWidth / 2, legTopY - torsoHeight, torsoWidth, torsoHeight, 9);
+  ctx.fill();
+  ctx.fillStyle = style.accent;
+  roundedRectPath(ctx, -torsoWidth / 2 + 4, legTopY - torsoHeight + 4, torsoWidth - 8, 7, 4);
+  ctx.fill();
+
+  ctx.fillStyle = style.skin;
+  ctx.beginPath();
+  ctx.ellipse(0, headY, 12, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  drawHair(style, headY);
+  drawFace(customer.phase, headY);
+
+  if (enjoying) {
+    drawDrinkGlass(drink, 16, headY + 12, 0.78);
+  }
+
+  ctx.restore();
+}
+
+function drawCustomerStageDecor(customer, drink, timestamp, baseY) {
+  if (customer.phase === "waiting" || customer.phase === "being_served") {
+    drawOrderBubble(
+      customer.x + 2,
+      baseY - 82,
+      drink,
+      customer.phase === "being_served" ? "Pouring" : customerLabel(customer.type),
+    );
+  }
+
+  if (customer.phase === "enjoying") {
+    const sparkleX = customer.x + 24;
+    const sparkleY = baseY - 74 + Math.sin((timestamp / 160) + customer.id) * 2;
+    drawSparkle(sparkleX, sparkleY, 6, "#fff1a6");
+    drawSparkle(sparkleX + 12, sparkleY + 10, 4, "#ffe4d1");
+  }
+}
+
+function drawOrderBubble(x, y, drink, caption) {
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 248, 230, 0.96)";
+  roundedRectPath(ctx, x - 36, y - 18, 72, 36, 14);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x - 8, y + 18);
+  ctx.lineTo(x, y + 26);
+  ctx.lineTo(x + 8, y + 18);
+  ctx.closePath();
+  ctx.fill();
+  drawDrinkGlass(drink, x - 16, y + 8, 0.56);
+  ctx.fillStyle = "#5f351c";
+  ctx.font = '700 11px "Trebuchet MS", sans-serif';
+  ctx.textAlign = "left";
+  ctx.fillText(drink.shortLabel, x - 2, y - 1);
+  ctx.font = '600 9px "Trebuchet MS", sans-serif';
+  ctx.fillStyle = "#8d6040";
+  ctx.fillText(caption, x - 2, y + 11);
+  ctx.restore();
+}
+
+function drawSparkle(x, y, size, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x - size, y);
+  ctx.lineTo(x + size, y);
+  ctx.moveTo(x, y - size);
+  ctx.lineTo(x, y + size);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawDrinkGlass(drink, x, y, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = "rgba(30, 16, 8, 0.18)";
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 9, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = drink.cup;
+  roundedRectPath(ctx, -8, -22, 16, 22, 5);
+  ctx.fill();
+
+  ctx.fillStyle = drink.liquid;
+  roundedRectPath(ctx, -6, -17, 12, 15, 4);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.52)";
+  for (let ice = 0; ice < 3; ice += 1) {
+    roundedRectPath(ctx, -5 + ice * 4, -16 + (ice % 2), 3, 3, 1);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = drink.straw;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(3, -24);
+  ctx.lineTo(7, -34);
+  ctx.stroke();
+
+  ctx.fillStyle = drink.garnish;
+  ctx.beginPath();
+  ctx.ellipse(-6, -23, 4, 2, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawLimbSegment(x, y, width, length, rotation, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.fillStyle = color;
+  roundedRectPath(ctx, -width / 2, 0, width, length, width / 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawHair(style, headY) {
+  ctx.save();
+  ctx.fillStyle = style.hair;
+
+  if (style.hairStyle === "long") {
+    roundedRectPath(ctx, -13, headY - 13, 26, 18, 8);
+    ctx.fill();
+    roundedRectPath(ctx, -13, headY - 4, 8, 16, 4);
+    ctx.fill();
+    roundedRectPath(ctx, 5, headY - 4, 8, 16, 4);
+    ctx.fill();
+  } else if (style.hairStyle === "bun") {
+    roundedRectPath(ctx, -13, headY - 13, 26, 14, 8);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, headY - 15, 5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (style.hairStyle === "cap") {
+    roundedRectPath(ctx, -13, headY - 13, 26, 12, 8);
+    ctx.fill();
+    roundedRectPath(ctx, 2, headY - 4, 10, 4, 2);
+    ctx.fill();
+  } else if (style.hairStyle === "puff") {
+    ctx.beginPath();
+    ctx.arc(-9, headY - 7, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(9, headY - 7, 5, 0, Math.PI * 2);
+    ctx.fill();
+    roundedRectPath(ctx, -11, headY - 10, 22, 12, 7);
+    ctx.fill();
+  } else if (style.hairStyle === "thin") {
+    roundedRectPath(ctx, -11, headY - 12, 22, 8, 5);
+    ctx.fill();
+  } else {
+    roundedRectPath(ctx, -12, headY - 13, 24, 12, 8);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawFace(phase, headY) {
+  ctx.save();
+  ctx.fillStyle = "#5b341f";
+  ctx.beginPath();
+  ctx.arc(-4, headY - 1, 1.4, 0, Math.PI * 2);
+  ctx.arc(4, headY - 1, 1.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#6e3f25";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  if (phase === "enjoying") {
+    ctx.arc(0, headY + 5, 4, 0.1, Math.PI - 0.1);
+  } else if (phase === "being_served") {
+    ctx.moveTo(-3, headY + 6);
+    ctx.lineTo(3, headY + 6);
+  } else {
+    ctx.arc(0, headY + 4, 3.5, 0.25, Math.PI - 0.25);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function getFacingDirection(entity) {
+  const nextPoint = Array.isArray(entity.waypoints) && entity.waypoints.length > 0
+    ? entity.waypoints[0]
+    : { x: entity.targetX, y: entity.targetY };
+  return nextPoint.x >= entity.x ? 1 : -1;
+}
+
+function drawDog() {
+  ctx.fillStyle = "#7e5737";
+  roundedRectPath(ctx, -18, -18, 36, 18, 8);
+  ctx.fill();
+  roundedRectPath(ctx, 10, -26, 16, 14, 7);
+  ctx.fill();
+  ctx.fillStyle = "#5f3b25";
+  roundedRectPath(ctx, -20, -18, 7, 16, 3);
+  ctx.fill();
+  roundedRectPath(ctx, -7, -18, 7, 16, 3);
+  ctx.fill();
+  roundedRectPath(ctx, 5, -18, 7, 16, 3);
+  ctx.fill();
+  roundedRectPath(ctx, 16, -18, 7, 16, 3);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-18, -16);
+  ctx.lineTo(-28, -24);
+  ctx.lineTo(-24, -8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#d44d44";
+  roundedRectPath(ctx, 12, -14, 9, 4, 2);
+  ctx.fill();
+  ctx.fillStyle = "#20130d";
+  ctx.beginPath();
+  ctx.arc(20, -21, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawCat() {
+  ctx.fillStyle = "#d7c3a3";
+  roundedRectPath(ctx, -16, -16, 30, 16, 8);
+  ctx.fill();
+  roundedRectPath(ctx, 9, -24, 14, 12, 6);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(12, -24);
+  ctx.lineTo(16, -31);
+  ctx.lineTo(18, -23);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(20, -24);
+  ctx.lineTo(24, -31);
+  ctx.lineTo(26, -23);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#b59f80";
+  roundedRectPath(ctx, -14, -16, 6, 15, 3);
+  ctx.fill();
+  roundedRectPath(ctx, -2, -16, 6, 15, 3);
+  ctx.fill();
+  roundedRectPath(ctx, 8, -16, 6, 15, 3);
+  ctx.fill();
+  roundedRectPath(ctx, 18, -16, 6, 15, 3);
+  ctx.fill();
+  ctx.strokeStyle = "#b59f80";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-14, -10);
+  ctx.quadraticCurveTo(-28, -28, -10, -34);
+  ctx.stroke();
+  ctx.fillStyle = "#1f140e";
+  ctx.beginPath();
+  ctx.arc(20, -19, 1.3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function exposeDebugState() {
   window.__planBGame = {
     getSnapshot() {
@@ -1452,6 +2361,7 @@ function exposeDebugState() {
         saveStatus: runtime.saveStatus,
         tables: structuredClone(gameState.tables),
         customers: structuredClone(gameState.customers),
+        wanderers: structuredClone(gameState.wanderers),
         stats: structuredClone(gameState.stats),
         coins: gameState.coins,
         score: gameState.score,
@@ -1461,8 +2371,23 @@ function exposeDebugState() {
         serveLevel: gameState.serveLevel,
         weatherState: gameState.weatherState,
         weatherRemaining: gameState.weatherRemaining,
+        windRemaining: gameState.windRemaining,
+        incidentLabel: currentIncidentLabel(),
+        drinkMenu: structuredClone(DRINK_TYPES),
         layout: structuredClone(TABLE_LAYOUT),
       };
+    },
+    debug: {
+      startWind() {
+        startWindEvent();
+        updateHud();
+      },
+      spawnWanderer(kind) {
+        if (kind === "dog" || kind === "cat") {
+          spawnWanderer(kind);
+          updateHud();
+        }
+      },
     },
   };
 }

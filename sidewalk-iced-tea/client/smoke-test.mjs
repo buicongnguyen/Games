@@ -103,6 +103,9 @@ async function runSmoke(serverUrl) {
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
 
     const initial = await page.evaluate(() => window.__planBGame.getSnapshot());
+    if (!Array.isArray(initial.drinkMenu) || initial.drinkMenu.length < 6) {
+      throw new Error("Drink menu did not expose the expected variety.");
+    }
     const cacheSummary = await verifyServiceWorkerCache(page, serverUrl);
 
     await page.click("#start-button");
@@ -117,6 +120,13 @@ async function runSmoke(serverUrl) {
       null,
       { timeout: 12000 },
     );
+    const waitingCustomer = await page.evaluate(() => {
+      const snapshot = window.__planBGame.getSnapshot();
+      return snapshot.customers.find((customer) => customer.phase === "waiting") || null;
+    });
+    if (!waitingCustomer?.drinkId) {
+      throw new Error("Waiting customer is missing a drink order.");
+    }
 
     const waitingTable = await page.evaluate(() => {
       const snapshot = window.__planBGame.getSnapshot();
@@ -140,6 +150,17 @@ async function runSmoke(serverUrl) {
       { timeout: 12000 },
     );
 
+    await page.evaluate(() => {
+      window.__planBGame.debug.startWind();
+      window.__planBGame.debug.spawnWanderer("dog");
+      window.__planBGame.debug.spawnWanderer("cat");
+    });
+    await page.waitForFunction(() => {
+      const snapshot = window.__planBGame.getSnapshot();
+      const kinds = snapshot.wanderers.map((wanderer) => wanderer.kind);
+      return snapshot.windRemaining > 0 && kinds.includes("dog") && kinds.includes("cat");
+    });
+
     const finalState = await page.evaluate(() => window.__planBGame.getSnapshot());
     await page.waitForTimeout(1400);
     const sessionBeforeReload = await readSessionSeconds(page);
@@ -162,6 +183,10 @@ async function runSmoke(serverUrl) {
       coins: finalState.coins,
       score: finalState.score,
       weather: finalState.weatherState,
+      incidentLabel: finalState.incidentLabel,
+      drinkMenuSize: finalState.drinkMenu.length,
+      wanderers: finalState.wanderers.map((wanderer) => wanderer.kind).sort(),
+      firstOrder: waitingCustomer.drinkId,
       missingAssetStatus: missingAssetSummary.status,
       missingAssetContentType: missingAssetSummary.contentType,
       missingAssetCached: cacheSummary.cachedAfterFetch,
