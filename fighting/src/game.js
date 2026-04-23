@@ -189,9 +189,9 @@
   ];
 
   const SHIP_LEVELS = [
-    { name: "Chapter 2-1", duration: 34, guns: 4, mines: 5, bulletRate: 1.45, riverSpeed: 76 },
-    { name: "Chapter 2-2", duration: 42, guns: 6, mines: 7, bulletRate: 1.15, riverSpeed: 88 },
-    { name: "Chapter 2-3", duration: 50, guns: 8, mines: 9, bulletRate: 0.95, riverSpeed: 102 },
+    { name: "Chapter 2-1", duration: 34, guns: 8, launchers: 2, mines: 5, bulletRate: 1.45, launcherRate: 4.3, riverSpeed: 76, pickupRate: 6.8 },
+    { name: "Chapter 2-2", duration: 42, guns: 10, launchers: 3, mines: 7, bulletRate: 1.15, launcherRate: 3.7, riverSpeed: 88, pickupRate: 5.9 },
+    { name: "Chapter 2-3", duration: 50, guns: 12, launchers: 4, mines: 9, bulletRate: 0.95, launcherRate: 3.1, riverSpeed: 102, pickupRate: 5.1 },
   ];
 
   const SHIP_CENTER = { x: WORLD.width / 2, y: 316 };
@@ -200,12 +200,21 @@
   const SHIP_FIRE_RATE = 0.13;
   const SHIP_BULLET_SPEED = 980;
   const SHIP_BULLET_LIFE = 2.25;
+  const SHIP_SUPPORT_MISSILE_SPEED = 268;
+  const SHIP_SUPPORT_MISSILE_FIRE_RATE = 0.58;
+  const SHIP_ENEMY_MISSILE_SPEED = 124;
+  const SHIP_ENEMY_MISSILE_TURN = 1.24;
   const SHIP_BANK_WIDTH = 224;
   const SHIP_GUN_LEFT_X = 118;
   const SHIP_GUN_RIGHT_X = WORLD.width - SHIP_GUN_LEFT_X;
+  const SHIP_LAUNCHER_LEFT_X = 74;
+  const SHIP_LAUNCHER_RIGHT_X = WORLD.width - SHIP_LAUNCHER_LEFT_X;
   const SHIP_MINE_SPREAD = 244;
   const SHIP_WATER_LEFT = 204;
   const SHIP_WATER_WIDTH = 552;
+  const SHIP_PICKUP_TYPES = ["star", "medal", "health", "smallgun"];
+  const SHIP_DUAL_DURATION = 7.5;
+  const SHIP_GUIDED_DURATION = 5;
 
   const HELI_LEVELS = [
     { name: "Chapter 3-1", duration: 42, holes: 12, missileRate: 2.8 },
@@ -1433,21 +1442,28 @@
         playerBullets: [],
         mines: [],
         guns: [],
+        launchers: [],
+        pickups: [],
+        shots: [],
+        blasts: [],
+        supportMissiles: [],
+        enemyMissiles: [],
         fx: [],
         fireCooldown: 0,
+        supportFireCooldown: 0,
+        pickupCooldown: level.pickupRate * 0.6,
+        dualUntil: 0,
+        guidedUntil: 0,
         autoTarget: null,
         failed: false,
         finished: false,
         messageUntil: 0,
       };
       for (let i = 0; i < level.guns; i += 1) {
-        const side = i % 2 === 0 ? -1 : 1;
-        this.ship.guns.push({
-          side,
-          y: 118 + (i * 73) % 330,
-          cooldown: Phaser.Math.FloatBetween(0.3, level.bulletRate),
-          alive: true,
-        });
+        this.ship.guns.push(this.createShipGun(i, 118 + (i * 62) % 358));
+      }
+      for (let i = 0; i < level.launchers; i += 1) {
+        this.ship.launchers.push(this.createShipLauncher(i, 152 + (i * 126) % 272));
       }
       for (let i = 0; i < level.mines; i += 1) {
         this.ship.mines.push(this.createMine(-Phaser.Math.Between(40, 520)));
@@ -1456,12 +1472,47 @@
       this.refreshHud(true);
     }
 
+    createShipGun(index, y) {
+      const side = index % 2 === 0 ? -1 : 1;
+      return {
+        id: `gun-${index}-${Math.random().toString(36).slice(2, 7)}`,
+        side,
+        y,
+        cooldown: Phaser.Math.FloatBetween(0.3, this.ship.level.bulletRate),
+        alive: true,
+        enemyAlive: true,
+        enemyOffsetY: Phaser.Math.Between(-6, 10),
+      };
+    }
+
+    createShipLauncher(index, y) {
+      const side = index % 2 === 0 ? -1 : 1;
+      return {
+        id: `launcher-${index}-${Math.random().toString(36).slice(2, 7)}`,
+        side,
+        y,
+        alive: true,
+        cooldown: this.ship.level.launcherRate + Phaser.Math.FloatBetween(-0.6, 0.5),
+      };
+    }
+
     createMine(y) {
       return {
         x: WORLD.width / 2 + Phaser.Math.Between(-SHIP_MINE_SPREAD, SHIP_MINE_SPREAD),
         y,
         pulse: Math.random() * Math.PI * 2,
         exploded: false,
+      };
+    }
+
+    createShipPickup(y, forcedType) {
+      const type = forcedType || Phaser.Utils.Array.GetRandom(SHIP_PICKUP_TYPES);
+      return {
+        id: `pickup-${type}-${Math.random().toString(36).slice(2, 7)}`,
+        type,
+        x: WORLD.width / 2 + Phaser.Math.Between(-214, 214),
+        y,
+        spin: Math.random() * Math.PI * 2,
       };
     }
 
@@ -1487,32 +1538,90 @@
       state.shipY = clamp(state.shipY, SHIP_LIMITS.top - SHIP_CENTER.y, SHIP_LIMITS.bottom - SHIP_CENTER.y);
       const ship = this.shipPosition();
       state.fireCooldown = Math.max(0, state.fireCooldown - dt);
+      state.supportFireCooldown = Math.max(0, state.supportFireCooldown - dt);
       state.autoTarget = null;
+      const autoTargets = this.firePad.active ? [] : this.pickShipAutoTargets(ship);
+      state.autoTarget = autoTargets[0] || null;
       if (state.fireCooldown <= 0) {
-        state.autoTarget = this.firePad.active ? null : this.pickShipAutoTarget(ship);
-        const shotDirection = this.firePad.active ? this.firePad : state.autoTarget;
-        if (shotDirection) {
-          this.fireShipGun(shotDirection);
+        if (this.firePad.active) {
+          this.fireShipGun(this.firePad);
+        } else if (state.autoTarget) {
+          if (state.dualUntil > this.elapsed && autoTargets.length > 1) {
+            const opposite =
+              autoTargets.find((target) => Math.sign(target.x) !== Math.sign(state.autoTarget.x) && target.kind !== "mine") ||
+              autoTargets[1] ||
+              state.autoTarget;
+            this.fireShipGun([state.autoTarget, opposite]);
+          } else {
+            this.fireShipGun(state.autoTarget);
+          }
         }
       }
+      if (state.guidedUntil > this.elapsed && state.supportFireCooldown <= 0 && state.autoTarget) {
+        this.launchShipSupportMissile(state.autoTarget);
+      }
 
-      for (const gun of state.guns) {
+      for (let i = 0; i < state.guns.length; i += 1) {
+        const gun = state.guns[i];
         gun.y += state.level.riverSpeed * dt;
         if (gun.y > WORLD.height + 46) {
-          gun.y = -Phaser.Math.Between(45, 130);
-          gun.cooldown = Phaser.Math.FloatBetween(0.25, state.level.bulletRate);
-          gun.alive = true;
+          Object.assign(gun, this.createShipGun(i, -Phaser.Math.Between(45, 130)));
         }
         if (!gun.alive) {
           continue;
         }
         gun.cooldown -= dt;
         if (gun.y > 58 && gun.y < WORLD.height - 34 && gun.cooldown <= 0) {
-          const x = gun.side < 0 ? SHIP_GUN_LEFT_X : SHIP_GUN_RIGHT_X;
+          const x = this.shipGunX(gun);
           const y = gun.y;
           const angle = Math.atan2(ship.y - y, ship.x - x);
           state.bullets.push({ x, y, vx: Math.cos(angle) * 185, vy: Math.sin(angle) * 185, life: 4 });
           gun.cooldown = state.level.bulletRate + Phaser.Math.FloatBetween(-0.25, 0.35);
+        }
+      }
+
+      for (let i = 0; i < state.launchers.length; i += 1) {
+        const launcher = state.launchers[i];
+        launcher.y += state.level.riverSpeed * dt;
+        if (launcher.y > WORLD.height + 68) {
+          Object.assign(launcher, this.createShipLauncher(i, -Phaser.Math.Between(80, 200)));
+          continue;
+        }
+        if (!launcher.alive) {
+          continue;
+        }
+        launcher.cooldown -= dt;
+        if (launcher.y > 72 && launcher.y < ship.y - 18 && launcher.cooldown <= 0) {
+          const x = this.shipLauncherX(launcher) + (launcher.side < 0 ? 10 : -10);
+          const y = launcher.y - 16;
+          const baseSize = 8 + state.levelIndex * 0.55 + Phaser.Math.FloatBetween(0, 1.2);
+          const maxSize = 16 + state.levelIndex * 1.45 + Phaser.Math.FloatBetween(0.3, 2);
+          const angle = Math.atan2(ship.y - y, ship.x - x);
+          state.enemyMissiles.push({
+            x,
+            y,
+            angle,
+            speed: SHIP_ENEMY_MISSILE_SPEED + state.levelIndex * 10 + Phaser.Math.FloatBetween(-4, 8),
+            size: baseSize,
+            baseSize,
+            maxSize,
+            displaySize: baseSize,
+            pulse: Math.random() * Math.PI * 2,
+            danger: 0,
+            life: 0,
+            dead: false,
+          });
+          state.shots.push({
+            fromX: x,
+            fromY: y,
+            x: x + Math.cos(angle) * 38,
+            y: y + Math.sin(angle) * 38,
+            life: 0.2,
+            maxLife: 0.2,
+            missile: true,
+            hostile: true,
+          });
+          launcher.cooldown = state.level.launcherRate + Phaser.Math.FloatBetween(-0.45, 0.55);
         }
       }
 
@@ -1523,19 +1632,57 @@
         bullet.y += bullet.vy * dt;
         bullet.life -= dt;
         let hitHazard = false;
+        for (const launcher of state.launchers) {
+          if (!launcher.alive) {
+            continue;
+          }
+          const launcherX = this.shipLauncherX(launcher);
+          if (pointSegmentDistance(launcherX, launcher.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < 34) {
+            bullet.life = 0;
+            hitHazard = this.explodeShipLauncher(launcher);
+            break;
+          }
+        }
+        if (hitHazard) {
+          continue;
+        }
+        for (const missile of state.enemyMissiles) {
+          const missileRadius = (missile.displaySize || missile.size || 10) * 0.48;
+          if (!missile.dead && pointSegmentDistance(missile.x, missile.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < missileRadius + 6) {
+            missile.dead = true;
+            bullet.life = 0;
+            hitHazard = true;
+            const reward = 36 + Math.round((missile.displaySize || missile.size || 10) * 1.4 + (missile.danger || 0) * 20);
+            state.score += reward;
+            this.score = state.score;
+            this.shipBlast(missile.x, missile.y, 30 + (missile.danger || 0) * 14, blendColor(palette.shock, palette.blast, missile.danger || 0.35), 10, 0.72);
+            break;
+          }
+        }
+        if (hitHazard) {
+          continue;
+        }
         for (const gun of state.guns) {
           if (!gun.alive) {
             continue;
           }
-          const gunX = gun.side < 0 ? SHIP_GUN_LEFT_X : SHIP_GUN_RIGHT_X;
+          const gunX = this.shipGunX(gun);
+          if (gun.enemyAlive) {
+            const enemy = this.shipEnemyPosition(gun);
+            if (pointSegmentDistance(enemy.x, enemy.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < 12) {
+              gun.enemyAlive = false;
+              bullet.life = 0;
+              hitHazard = true;
+              state.score += 18;
+              this.score = state.score;
+              this.shipHitFx(enemy.x, enemy.y, palette.targetDone, 7, 0.58);
+              this.showMessage("Enemy down");
+              break;
+            }
+          }
           if (pointSegmentDistance(gunX, gun.y, bullet.prevX, bullet.prevY, bullet.x, bullet.y) < 42) {
-            gun.alive = false;
             bullet.life = 0;
-            hitHazard = true;
-            state.score += 40;
-            this.score = state.score;
-            this.shipHitFx(gunX, gun.y, palette.blast, 10, 0.78);
-            this.showMessage("Cannon disabled");
+            hitHazard = this.killShipGun(gun, gunX, gun.y, 40, "Cannon disabled");
             break;
           }
         }
@@ -1604,12 +1751,131 @@
         }
       }
 
+      state.pickupCooldown -= dt;
+      if (state.pickupCooldown <= 0 && state.pickups.length < 2) {
+        state.pickups.push(this.createShipPickup(-Phaser.Math.Between(50, 220)));
+        state.pickupCooldown = state.level.pickupRate + Phaser.Math.FloatBetween(-1.2, 0.8);
+      }
+      for (const pickup of state.pickups) {
+        pickup.y += state.level.riverSpeed * dt;
+        pickup.spin += dt * 3.2;
+        if (Math.hypot(pickup.x - ship.x, pickup.y - ship.y) < 36) {
+          pickup.collected = true;
+          this.applyShipPickup(pickup.type);
+        }
+      }
+      state.pickups = state.pickups.filter((pickup) => !pickup.collected && pickup.y < WORLD.height + 44);
+
+      for (const missile of state.supportMissiles) {
+        missile.life += dt;
+        missile.speed += 12 * dt;
+        missile.size = Math.min(14, missile.size + 1.4 * dt);
+        const target = this.pickShipMissileTarget(missile.x, missile.y);
+        if (target) {
+          missile.targetKind = target.kind;
+          missile.targetX = target.x;
+          missile.targetY = target.y;
+          const targetAngle = Math.atan2(target.y - missile.y, target.x - missile.x);
+          missile.angle = turnToward(missile.angle, targetAngle, 1.65 * dt);
+        }
+        missile.x += Math.cos(missile.angle) * missile.speed * dt;
+        missile.y += Math.sin(missile.angle) * missile.speed * dt;
+        if (target && Math.hypot(missile.x - target.x, missile.y - target.y) < 18 + missile.size * 0.45) {
+          missile.dead = true;
+          if (target.kind === "launcher") {
+            const launcher = state.launchers.find((item) => item.alive && Math.abs(this.shipLauncherX(item) - target.x) < 2 && Math.abs(item.y - target.y) < 2);
+            if (launcher) {
+              this.explodeShipLauncher(launcher, "Launcher house destroyed");
+            }
+          } else if (target.kind === "enemyMissile") {
+            const enemyMissile = state.enemyMissiles.find((item) => !item.dead && Math.abs(item.x - target.x) < 3 && Math.abs(item.y - target.y) < 3);
+            if (enemyMissile) {
+              enemyMissile.dead = true;
+              state.score += 42;
+              this.score = state.score;
+              this.shipBlast(enemyMissile.x, enemyMissile.y, 34, blendColor(palette.shock, palette.blast, enemyMissile.danger || 0.35), 12, 0.78);
+            }
+          } else if (target.kind === "gun") {
+            const gun = state.guns.find((item) => item.alive && Math.abs(this.shipGunX(item) - target.x) < 2 && Math.abs(item.y - target.y) < 2);
+            if (gun) {
+              this.killShipGun(gun, target.x, target.y, 44, "Guided strike");
+            }
+          } else if (target.kind === "enemy") {
+            const gun = state.guns.find((item) => item.enemyAlive && Math.abs(this.shipEnemyPosition(item).x - target.x) < 2 && Math.abs(this.shipEnemyPosition(item).y - target.y) < 2);
+            if (gun) {
+              gun.enemyAlive = false;
+              state.score += 24;
+              this.score = state.score;
+              this.shipBlast(target.x, target.y, 36, palette.shock, 10, 0.72);
+            }
+          } else if (target.kind === "mine") {
+            const mine = state.mines.find((item) => !item.exploded && Math.abs(item.x - target.x) < 2 && Math.abs(item.y - target.y) < 2);
+            if (mine) {
+              mine.exploded = true;
+              state.score += 34;
+              this.score = state.score;
+              this.shipBlast(target.x, target.y, 42, palette.blast, 12, 0.82);
+            }
+          }
+        } else if (missile.life > 4 || missile.x < -50 || missile.x > WORLD.width + 50 || missile.y < -50 || missile.y > WORLD.height + 50) {
+          missile.dead = true;
+        }
+      }
+      state.supportMissiles = state.supportMissiles.filter((missile) => !missile.dead);
+
+      for (const missile of state.enemyMissiles) {
+        missile.life += dt;
+        missile.speed += 8 * dt;
+        missile.pulse += dt * (5.4 + state.levelIndex * 0.45);
+        missile.size = Math.min(missile.maxSize || 16, missile.size + (2 + state.levelIndex * 0.24) * dt);
+        missile.displaySize = clamp(
+          missile.size + Math.sin(missile.pulse) * 1.05,
+          (missile.baseSize || missile.size) * 0.92,
+          (missile.maxSize || missile.size) + 0.8
+        );
+        missile.danger = clamp(
+          ((missile.displaySize || missile.size) - (missile.baseSize || missile.size)) /
+            Math.max(1, (missile.maxSize || missile.size) - (missile.baseSize || missile.size)),
+          0,
+          1
+        );
+        const targetAngle = Math.atan2(ship.y - missile.y, ship.x - missile.x);
+        missile.angle = turnToward(missile.angle, targetAngle, SHIP_ENEMY_MISSILE_TURN * dt);
+        missile.x += Math.cos(missile.angle) * missile.speed * dt;
+        missile.y += Math.sin(missile.angle) * missile.speed * dt;
+        const distance = Math.hypot(missile.x - ship.x, missile.y - ship.y);
+        if (distance < 18) {
+          missile.dead = true;
+          this.shipBlast(missile.x, missile.y, 44, palette.blast, 16, 1.08);
+          this.failShip("Controller hit");
+        } else if (distance < 62) {
+          missile.dead = true;
+          this.shipBlast(missile.x, missile.y, 46, palette.blast, 16, 1.08);
+          if (state.armor > 0) {
+            this.damageShipShield("Missile hit");
+          } else {
+            this.failShip("Missile breached hull");
+          }
+        } else if (missile.y > WORLD.height + 56 || missile.x < -80 || missile.x > WORLD.width + 80 || missile.life > 5.2) {
+          missile.dead = true;
+        }
+      }
+      state.enemyMissiles = state.enemyMissiles.filter((missile) => !missile.dead);
+
       for (const particle of state.fx) {
         particle.life -= dt;
         particle.x += particle.vx * dt;
         particle.y += particle.vy * dt;
       }
       state.fx = state.fx.filter((particle) => particle.life > 0);
+      for (const shot of state.shots) {
+        shot.life -= dt;
+      }
+      state.shots = state.shots.filter((shot) => shot.life > 0);
+      for (const blast of state.blasts) {
+        blast.life -= dt;
+      }
+      state.blasts = state.blasts.filter((blast) => blast.life > 0);
 
       if (state.timeLeft <= 0) {
         state.finished = true;
@@ -1625,6 +1891,21 @@
 
     shipPosition() {
       return { x: SHIP_CENTER.x + this.ship.shipX, y: SHIP_CENTER.y + this.ship.shipY };
+    }
+
+    shipGunX(gun) {
+      return gun.side < 0 ? SHIP_GUN_LEFT_X : SHIP_GUN_RIGHT_X;
+    }
+
+    shipLauncherX(launcher) {
+      return launcher.side < 0 ? SHIP_LAUNCHER_LEFT_X : SHIP_LAUNCHER_RIGHT_X;
+    }
+
+    shipEnemyPosition(gun) {
+      return {
+        x: this.shipGunX(gun) + (gun.side < 0 ? 34 : -34),
+        y: gun.y + (gun.enemyOffsetY || 0) + 12,
+      };
     }
 
     shipShieldTotal() {
@@ -1652,35 +1933,115 @@
       return false;
     }
 
-    pickShipAutoTarget(ship) {
+    shipBlast(x, y, radius, color, count, scale) {
+      this.ship.blasts.push({
+        x,
+        y,
+        radius,
+        color: color || palette.blast,
+        life: 0.34,
+        maxLife: 0.34,
+      });
+      this.shipHitFx(x, y, color || palette.blast, count || 16, scale || 1);
+    }
+
+    killShipGun(gun, x, y, score, message) {
+      if (!gun || !gun.alive) {
+        return false;
+      }
+      gun.alive = false;
+      gun.enemyAlive = false;
+      this.ship.score += score || 40;
+      this.score = this.ship.score;
+      this.shipBlast(x, y, 26, palette.blast, 10, 0.84);
+      if (message) {
+        this.showMessage(message);
+      }
+      return true;
+    }
+
+    explodeShipLauncher(launcher, sourceMessage) {
+      if (!launcher || !launcher.alive) {
+        return false;
+      }
+      launcher.alive = false;
+      const x = this.shipLauncherX(launcher);
+      const y = launcher.y;
+      this.ship.score += 65;
+      this.score = this.ship.score;
+      this.shipBlast(x, y, 116, palette.blast, 20, 1.35);
+      for (const gun of this.ship.guns) {
+        if (!gun.alive) {
+          continue;
+        }
+        const gunX = this.shipGunX(gun);
+        if (Math.hypot(gunX - x, gun.y - y) <= 118) {
+          this.killShipGun(gun, gunX, gun.y, 24);
+        } else if (gun.enemyAlive) {
+          const enemy = this.shipEnemyPosition(gun);
+          if (Math.hypot(enemy.x - x, enemy.y - y) <= 122) {
+            gun.enemyAlive = false;
+            this.ship.score += 18;
+            this.score = this.ship.score;
+            this.shipHitFx(enemy.x, enemy.y, palette.targetDone, 6, 0.56);
+          }
+        }
+      }
+      for (const other of this.ship.launchers) {
+        if (other !== launcher && other.alive) {
+          const otherX = this.shipLauncherX(other);
+          if (Math.hypot(otherX - x, other.y - y) <= 88) {
+            other.alive = false;
+            this.shipHitFx(otherX, other.y, palette.blast, 10, 0.8);
+          }
+        }
+      }
+      this.showMessage(sourceMessage || "Launcher house destroyed");
+      return true;
+    }
+
+    pickShipAutoTargets(ship) {
       if (!this.ship) {
-        return null;
+        return [];
       }
       const fromY = ship.y - 36;
-      let best = null;
+      const targets = [];
       const consider = (kind, x, y, bias, alert) => {
         if (y < -28 || y > ship.y + 72 || x < 0 || x > WORLD.width) {
           return;
         }
         const distance = Math.hypot(x - ship.x, y - fromY);
         const score = distance + bias - (alert || 0) * 90;
-        if (!best || score < best.score) {
-          best = {
-            kind,
-            x: x - ship.x,
-            y: y - fromY,
-            targetX: x,
-            targetY: y,
-            score,
-          };
-        }
+        targets.push({
+          kind,
+          x: x - ship.x,
+          y: y - fromY,
+          targetX: x,
+          targetY: y,
+          score,
+        });
       };
 
+      for (const launcher of this.ship.launchers) {
+        if (!launcher.alive) {
+          continue;
+        }
+        consider("launcher", this.shipLauncherX(launcher), launcher.y, -170, 0);
+      }
+      for (const missile of this.ship.enemyMissiles) {
+        if (!missile.dead) {
+          consider("enemyMissile", missile.x, missile.y, -230, missile.danger || 0.3);
+        }
+      }
       for (const gun of this.ship.guns) {
         if (!gun.alive) {
           continue;
         }
-        consider("gun", gun.side < 0 ? SHIP_GUN_LEFT_X : SHIP_GUN_RIGHT_X, gun.y, -140, 0);
+        consider("gun", this.shipGunX(gun), gun.y, -140, 0);
+        if (gun.enemyAlive) {
+          const enemy = this.shipEnemyPosition(gun);
+          consider("enemy", enemy.x, enemy.y, -110, 0);
+        }
       }
       for (const mine of this.ship.mines) {
         if (mine.exploded) {
@@ -1688,26 +2049,131 @@
         }
         consider("mine", mine.x, mine.y, mine.y > ship.y - 24 ? -70 : 26, mine.alert || 0);
       }
-      return best;
+      targets.sort((a, b) => a.score - b.score);
+      return targets;
     }
 
-    fireShipGun(direction) {
+    pickShipMissileTarget(x, y) {
+      const hazards = [];
+      for (const launcher of this.ship.launchers) {
+        if (launcher.alive) {
+          hazards.push({ kind: "launcher", x: this.shipLauncherX(launcher), y: launcher.y });
+        }
+      }
+      for (const missile of this.ship.enemyMissiles) {
+        if (!missile.dead) {
+          hazards.push({ kind: "enemyMissile", x: missile.x, y: missile.y });
+        }
+      }
+      for (const gun of this.ship.guns) {
+        if (gun.alive) {
+          hazards.push({ kind: "gun", x: this.shipGunX(gun), y: gun.y });
+          if (gun.enemyAlive) {
+            const enemy = this.shipEnemyPosition(gun);
+            hazards.push({ kind: "enemy", x: enemy.x, y: enemy.y });
+          }
+        }
+      }
+      for (const mine of this.ship.mines) {
+        if (!mine.exploded) {
+          hazards.push({ kind: "mine", x: mine.x, y: mine.y });
+        }
+      }
+      hazards.sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
+      return hazards[0] || null;
+    }
+
+    launchShipSupportMissile(target) {
+      const ship = this.shipPosition();
+      this.ship.supportMissiles.push({
+        x: ship.x,
+        y: ship.y - 18,
+        angle: Math.atan2(target.targetY - (ship.y - 18), target.targetX - ship.x),
+        speed: SHIP_SUPPORT_MISSILE_SPEED,
+        size: 9,
+        life: 0,
+        targetKind: target.kind,
+        targetX: target.targetX,
+        targetY: target.targetY,
+        dead: false,
+      });
+      this.ship.supportFireCooldown = SHIP_SUPPORT_MISSILE_FIRE_RATE;
+      this.ship.shots.push({
+        fromX: ship.x,
+        fromY: ship.y - 18,
+        x: ship.x,
+        y: ship.y - 18,
+        life: 0.18,
+        maxLife: 0.18,
+        missile: true,
+        guided: true,
+      });
+    }
+
+    applyShipPickup(type) {
+      if (!this.ship) {
+        return;
+      }
+      if (type === "health") {
+        this.ship.shieldHp = [3, 3, 3];
+        this.ship.armor = this.shipShieldTotal();
+        this.shipBlast(this.shipPosition().x, this.shipPosition().y - 4, 42, palette.targetDone, 12, 0.88);
+        this.showMessage("Shield restored");
+        return;
+      }
+      if (type === "star") {
+        this.ship.dualUntil = Math.max(this.ship.dualUntil, this.elapsed + SHIP_DUAL_DURATION);
+        this.ship.score += 60;
+        this.score = this.ship.score;
+        this.showMessage("Twin guns online");
+        return;
+      }
+      if (type === "smallgun") {
+        this.ship.guidedUntil = Math.max(this.ship.guidedUntil, this.elapsed + SHIP_GUIDED_DURATION);
+        this.ship.score += 50;
+        this.score = this.ship.score;
+        this.showMessage("Guided missiles online");
+        return;
+      }
+      this.ship.score += 120;
+      this.score = this.ship.score;
+      this.showMessage("Medal +120");
+    }
+
+    fireShipGun(directions) {
       if (!this.ship || this.ship.failed || this.ship.finished) {
         return;
       }
       const ship = this.shipPosition();
-      const dx = direction && Math.abs(direction.x) + Math.abs(direction.y) > 0.08 ? direction.x : 0;
-      const dy = direction && Math.abs(direction.x) + Math.abs(direction.y) > 0.08 ? direction.y : -1;
-      const length = Math.hypot(dx, dy) || 1;
-      this.ship.playerBullets.push({
-        x: ship.x,
-        y: ship.y - 36,
-        prevX: ship.x,
-        prevY: ship.y - 36,
-        vx: (dx / length) * SHIP_BULLET_SPEED,
-        vy: (dy / length) * SHIP_BULLET_SPEED,
-        life: SHIP_BULLET_LIFE,
-      });
+      const list = Array.isArray(directions) ? directions : [directions];
+      const dualActive = this.ship.dualUntil > this.elapsed;
+      const muzzles = dualActive ? [-16, 16] : [0];
+      for (let i = 0; i < muzzles.length; i += 1) {
+        const direction = list[Math.min(i, list.length - 1)] || list[0];
+        const dx = direction && Math.abs(direction.x) + Math.abs(direction.y) > 0.08 ? direction.x : 0;
+        const dy = direction && Math.abs(direction.x) + Math.abs(direction.y) > 0.08 ? direction.y : -1;
+        const length = Math.hypot(dx, dy) || 1;
+        const fromX = ship.x + muzzles[i];
+        const fromY = ship.y - 36;
+        this.ship.playerBullets.push({
+          x: fromX,
+          y: fromY,
+          prevX: fromX,
+          prevY: fromY,
+          vx: (dx / length) * SHIP_BULLET_SPEED,
+          vy: (dy / length) * SHIP_BULLET_SPEED,
+          life: SHIP_BULLET_LIFE,
+        });
+        this.ship.shots.push({
+          fromX,
+          fromY,
+          x: fromX + (dx / length) * 520,
+          y: fromY + (dy / length) * 520,
+          life: 0.18,
+          maxLife: 0.18,
+          missile: false,
+        });
+      }
       this.ship.fireCooldown = SHIP_FIRE_RATE;
     }
 
@@ -1772,15 +2238,37 @@
       }
       this.drawShipMotionLayer(state);
 
+      for (const launcher of state.launchers) {
+        if (!launcher.alive || launcher.y < -42 || launcher.y > WORLD.height + 42) {
+          continue;
+        }
+        const x = this.shipLauncherX(launcher);
+        const baseX = x + (launcher.side < 0 ? -26 : -34);
+        this.map.fillStyle(0x5f5143, 1);
+        this.map.fillRoundedRect(baseX, launcher.y - 20, 60, 38, 6);
+        this.map.fillStyle(0x8d6f55, 1);
+        this.map.fillTriangle(baseX - 4, launcher.y - 20, baseX + 30, launcher.y - 38, baseX + 64, launcher.y - 20);
+        this.map.fillStyle(0x2a3138, 1);
+        this.map.fillRoundedRect(baseX + 18, launcher.y - 14, 24, 22, 4);
+        this.map.fillStyle(palette.pod, 0.92);
+        this.map.fillTriangle(baseX + 28, launcher.y - 28, baseX + 38, launcher.y - 10, baseX + 18, launcher.y - 10);
+        this.map.lineStyle(1, 0xfcefb5, 0.2);
+        this.map.strokeRoundedRect(baseX, launcher.y - 20, 60, 38, 6);
+      }
+
       for (const gun of state.guns) {
         if (!gun.alive || gun.y < -32 || gun.y > WORLD.height + 32) {
           continue;
         }
-        const x = gun.side < 0 ? SHIP_GUN_LEFT_X : SHIP_GUN_RIGHT_X;
+        const x = this.shipGunX(gun);
         this.map.fillStyle(0x2d3338, 1);
         this.map.fillRoundedRect(x - 14, gun.y - 12, 28, 24, 4);
         this.map.fillStyle(0x1a2026, 1);
         this.map.fillRect(x + (gun.side < 0 ? 8 : -28), gun.y - 3, 20, 6);
+        if (gun.enemyAlive) {
+          const enemy = this.shipEnemyPosition(gun);
+          drawEnemyFigure(this.map, enemy.x, enemy.y, palette.target, 1, 0.28, "standing", 1);
+        }
       }
 
       for (const mine of state.mines) {
@@ -1802,9 +2290,65 @@
         this.map.strokeCircle(mine.x, mine.y, radius + 5);
       }
 
+      for (const pickup of state.pickups) {
+        this.dynamic.save();
+        this.dynamic.translateCanvas(pickup.x, pickup.y);
+        this.dynamic.rotateCanvas(pickup.spin);
+        if (pickup.type === "star") {
+          this.dynamic.fillStyle(0xffd55a, 1);
+          this.dynamic.beginPath();
+          for (let i = 0; i < 5; i += 1) {
+            const outer = (-Math.PI / 2) + (i * Math.PI * 2) / 5;
+            const inner = outer + Math.PI / 5;
+            if (i === 0) {
+              this.dynamic.moveTo(Math.cos(outer) * 13, Math.sin(outer) * 13);
+            } else {
+              this.dynamic.lineTo(Math.cos(outer) * 13, Math.sin(outer) * 13);
+            }
+            this.dynamic.lineTo(Math.cos(inner) * 6, Math.sin(inner) * 6);
+          }
+          this.dynamic.closePath();
+          this.dynamic.fillPath();
+        } else if (pickup.type === "medal") {
+          this.dynamic.fillStyle(0xb884ff, 1);
+          this.dynamic.fillRect(-5, -14, 4, 11);
+          this.dynamic.fillRect(1, -14, 4, 11);
+          this.dynamic.fillStyle(0xffd267, 1);
+          this.dynamic.fillCircle(0, 3, 11);
+          this.dynamic.lineStyle(2, 0xfff0b3, 0.68);
+          this.dynamic.strokeCircle(0, 3, 7);
+        } else if (pickup.type === "health") {
+          this.dynamic.fillStyle(0xe8f5ff, 1);
+          this.dynamic.fillRoundedRect(-13, -12, 26, 24, 6);
+          this.dynamic.fillStyle(0xff6b5d, 1);
+          this.dynamic.fillRect(-4, -8, 8, 16);
+          this.dynamic.fillRect(-8, -4, 16, 8);
+        } else {
+          this.dynamic.fillStyle(0x243341, 1);
+          this.dynamic.fillRoundedRect(-12, -9, 24, 18, 5);
+          this.dynamic.fillStyle(0x9bd5ff, 1);
+          this.dynamic.fillRect(-1, -11, 10, 6);
+          this.dynamic.fillRect(-10, -2, 16, 4);
+          this.dynamic.fillStyle(0xffcc4d, 0.9);
+          this.dynamic.fillCircle(5, -6, 3);
+        }
+        this.dynamic.restore();
+        this.dynamic.lineStyle(1.5, 0xffffff, 0.24);
+        this.dynamic.strokeCircle(pickup.x, pickup.y, 16);
+      }
+
       for (const bullet of state.bullets) {
         this.dynamic.fillStyle(0xffefe0, 1);
         this.dynamic.fillCircle(bullet.x, bullet.y, 4);
+      }
+
+      for (const shot of state.shots) {
+        const alpha = clamp(shot.life / shot.maxLife, 0, 1);
+        const color = shot.missile ? palette.blast : palette.shock;
+        this.dynamic.lineStyle(shot.guided ? 3 : 2, color, alpha * 0.85);
+        this.dynamic.lineBetween(shot.fromX, shot.fromY, shot.x, shot.y);
+        this.dynamic.fillStyle(color, alpha);
+        this.dynamic.fillCircle(shot.x, shot.y, shot.guided ? 5 : 3);
       }
 
       for (const bullet of state.playerBullets) {
@@ -1812,6 +2356,53 @@
         this.dynamic.lineBetween(bullet.prevX, bullet.prevY, bullet.x, bullet.y);
         this.dynamic.fillStyle(palette.shock, 1);
         this.dynamic.fillCircle(bullet.x, bullet.y, 3.4);
+      }
+
+      for (const missile of state.supportMissiles) {
+        this.dynamic.save();
+        this.dynamic.translateCanvas(missile.x, missile.y);
+        this.dynamic.rotateCanvas(missile.angle);
+        this.dynamic.fillStyle(palette.blast, 0.22);
+        this.dynamic.fillTriangle(-11, -6, -11, 6, 7, 0);
+        this.dynamic.fillStyle(0xdde8ee, 1);
+        this.dynamic.fillRoundedRect(-8, -3, 16, 6, 3);
+        this.dynamic.fillStyle(0xffcc4d, 1);
+        this.dynamic.fillTriangle(8, 0, 1, -5, 1, 5);
+        this.dynamic.fillStyle(0xff6b5d, 0.82);
+        this.dynamic.fillTriangle(-10, 0, -18, -4, -18, 4);
+        this.dynamic.restore();
+      }
+
+      for (const missile of state.enemyMissiles) {
+        const missileSize = missile.displaySize || missile.size || 10;
+        const hotColor = blendColor(0xffc94b, 0xff5a42, missile.danger || 0);
+        const bodyColor = blendColor(0xdde8ee, 0xffb16a, (missile.danger || 0) * 0.72);
+        const glowColor = blendColor(palette.shock, palette.blast, missile.danger || 0);
+        this.dynamic.save();
+        this.dynamic.translateCanvas(missile.x, missile.y);
+        this.dynamic.rotateCanvas(missile.angle);
+        this.dynamic.fillStyle(glowColor, 0.18 + (missile.danger || 0) * 0.16);
+        this.dynamic.fillTriangle(-0.98 * missileSize, -0.56 * missileSize, -0.98 * missileSize, 0.56 * missileSize, 0.92 * missileSize, 0);
+        this.dynamic.fillStyle(bodyColor, 1);
+        this.dynamic.fillRoundedRect(-0.62 * missileSize, -0.24 * missileSize, 1.28 * missileSize, 0.48 * missileSize, 4);
+        this.dynamic.fillStyle(hotColor, 1);
+        this.dynamic.fillTriangle(0.9 * missileSize, 0, 0.26 * missileSize, -0.44 * missileSize, 0.26 * missileSize, 0.44 * missileSize);
+        this.dynamic.fillStyle(0xff7c56, 0.82 + (missile.danger || 0) * 0.14);
+        this.dynamic.fillTriangle(-0.74 * missileSize, 0, -1.52 * missileSize, -0.28 * missileSize, -1.52 * missileSize, 0.28 * missileSize);
+        this.dynamic.fillStyle(0x20303e, 0.9);
+        this.dynamic.fillRect(-0.28 * missileSize, -0.14 * missileSize, 0.34 * missileSize, 0.28 * missileSize);
+        this.dynamic.restore();
+        this.dynamic.lineStyle(1.5, glowColor, 0.28 + (missile.danger || 0) * 0.28);
+        this.dynamic.strokeCircle(missile.x, missile.y, missileSize + 3 + Math.sin(missile.pulse || 0) * 1.2);
+      }
+
+      for (const blast of state.blasts) {
+        const alpha = clamp(blast.life / blast.maxLife, 0, 1);
+        const progress = 1 - alpha;
+        this.fx.lineStyle(2, blast.color, alpha * 0.7);
+        this.fx.strokeCircle(blast.x, blast.y, blast.radius * (0.32 + progress * 0.68));
+        this.fx.fillStyle(blast.color, alpha * 0.12);
+        this.fx.fillCircle(blast.x, blast.y, blast.radius * (0.18 + progress * 0.42));
       }
 
       const ship = this.shipPosition();
@@ -1823,7 +2414,7 @@
       }
       if (state.autoTarget && !this.firePad.active) {
         this.dynamic.lineStyle(1.5, 0x7ef4ff, 0.26);
-        this.dynamic.strokeCircle(state.autoTarget.targetX, state.autoTarget.targetY, state.autoTarget.kind === "gun" ? 18 : 14);
+        this.dynamic.strokeCircle(state.autoTarget.targetX, state.autoTarget.targetY, state.autoTarget.kind === "launcher" ? 22 : state.autoTarget.kind === "gun" ? 18 : 14);
       }
       this.dynamic.save();
       this.dynamic.translateCanvas(ship.x, ship.y);
@@ -2358,7 +2949,13 @@
     refreshHud(force) {
       let hud = "";
       if (this.mode === "ship") {
-        hud = `ship|${this.ship.levelIndex}|${Math.ceil(this.ship.timeLeft)}|${this.ship.shieldHp.join("-")}|${this.ship.armor}|${this.score}`;
+        const shipFlags = [
+          this.ship.dualUntil > this.elapsed ? "dual" : "",
+          this.ship.guidedUntil > this.elapsed ? "guided" : "",
+        ]
+          .filter(Boolean)
+          .join("-");
+        hud = `ship|${this.ship.levelIndex}|${Math.ceil(this.ship.timeLeft)}|${this.ship.shieldHp.join("-")}|${this.ship.armor}|${shipFlags}|${this.score}`;
       } else if (this.mode === "heli") {
         const shields = this.heli.shields.map((shield) => (shield.alive ? "1" : "0")).join("");
         hud = `heli|${this.heli.levelIndex}|${Math.ceil(this.heli.timeLeft)}|${this.heli.armor}|${this.heli.weapon}|${Math.round(this.heli.heliX)}|${Math.round(this.heli.heliY)}|${shields}|${this.score}`;
@@ -2378,7 +2975,14 @@
         els.scoreLabel.textContent = "Score";
         els.stage.textContent = `C2 ${this.ship.levelIndex + 1}/${SHIP_LEVELS.length}`;
         els.targets.textContent = `${Math.ceil(this.ship.timeLeft)}s`;
-        els.pods.textContent = `${this.ship.shieldHp.join("/")}`;
+        const shipModes = [];
+        if (this.ship.dualUntil > this.elapsed) {
+          shipModes.push("2x");
+        }
+        if (this.ship.guidedUntil > this.elapsed) {
+          shipModes.push("GM");
+        }
+        els.pods.textContent = `${this.ship.shieldHp.join("/")} ${shipModes.join(" ")}`.trim();
         els.score.textContent = `${this.score}`;
       } else if (this.mode === "heli") {
         els.stageLabel.textContent = "Heli";
