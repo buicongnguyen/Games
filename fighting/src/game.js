@@ -356,78 +356,236 @@
     };
   }
 
-  function drawStickFigure(graphics, x, y, color, alpha, scale) {
+  function drawEnemyStanding(graphics, color, alpha, scale) {
     const s = scale || 1;
-    graphics.lineStyle(Math.max(1.3, 3 * s), color, alpha);
-    graphics.strokeCircle(x, y - 20 * s, 6 * s);
-    graphics.beginPath();
-    graphics.moveTo(x, y - 14 * s);
-    graphics.lineTo(x, y + 4 * s);
-    graphics.moveTo(x - 10 * s, y - 7 * s);
-    graphics.lineTo(x + 10 * s, y - 7 * s);
-    graphics.moveTo(x, y + 4 * s);
-    graphics.lineTo(x - 9 * s, y + 17 * s);
-    graphics.moveTo(x, y + 4 * s);
-    graphics.lineTo(x + 9 * s, y + 17 * s);
-    graphics.strokePath();
+    const body = blendColor(0x10161d, color, 0.68);
+    const armor = blendColor(0x32414d, color, 0.28);
+    const accent = blendColor(color, palette.shock, 0.32);
+    graphics.fillStyle(0x04080b, alpha * 0.22);
+    graphics.fillEllipse(0, 16 * s, 26 * s, 7 * s);
+    graphics.fillStyle(body, alpha);
+    graphics.fillCircle(0, -19 * s, 6.2 * s);
+    graphics.fillStyle(armor, alpha * 0.95);
+    graphics.fillEllipse(0, -22.5 * s, 13 * s, 6 * s);
+    graphics.fillStyle(body, alpha);
+    graphics.fillRoundedRect(-5.2 * s, -13 * s, 10.4 * s, 18 * s, 3.8 * s);
+    graphics.fillStyle(armor, alpha * 0.84);
+    graphics.fillRoundedRect(-3.4 * s, -10.5 * s, 6.8 * s, 10.5 * s, 2.5 * s);
+    graphics.fillStyle(body, alpha * 0.94);
+    graphics.fillRect(-7.2 * s, -10.5 * s, 2.5 * s, 12 * s);
+    graphics.fillRect(4.7 * s, -9.6 * s, 2.6 * s, 11 * s);
+    graphics.fillRect(-4 * s, 4.6 * s, 3.1 * s, 12.8 * s);
+    graphics.fillRect(0.9 * s, 4.6 * s, 3.1 * s, 12.8 * s);
+    graphics.fillStyle(0x070d11, alpha * 0.5);
+    graphics.fillRoundedRect(-8.2 * s, -9.6 * s, 2.6 * s, 9.2 * s, 1.2 * s);
+    graphics.fillStyle(accent, alpha * 0.78);
+    graphics.fillRoundedRect(3.2 * s, -7.4 * s, 13.2 * s, 2.3 * s, 1.1 * s);
+    graphics.fillRect(13.8 * s, -8.8 * s, 1.6 * s, 4.8 * s);
   }
 
-  function drawCrawlingFigure(graphics, x, y, color, alpha, scale, progress) {
+  function drawEnemyCrawling(graphics, color, alpha, scale, progress) {
     const s = scale || 1;
-    const rise = (1 - clamp(progress, 0, 1)) * 10 * s;
-    const baseY = y + rise;
-    graphics.lineStyle(Math.max(1, 2.5 * s), color, alpha);
-    graphics.strokeCircle(x - 12 * s, baseY - 10 * s, 5 * s);
+    const t = clamp(progress, 0, 1);
+    const body = blendColor(0x0e141a, color, 0.66);
+    const armor = blendColor(0x31424c, color, 0.26);
+    const accent = blendColor(color, palette.shock, 0.3);
+    const baseY = (1 - t) * 10 * s;
+    graphics.fillStyle(0x04080b, alpha * 0.18);
+    graphics.fillEllipse(0, 12 * s + baseY, 30 * s, 6 * s);
+    graphics.fillStyle(body, alpha);
+    graphics.fillCircle(-10 * s, -8 * s + baseY, 5.2 * s);
+    graphics.fillStyle(armor, alpha * 0.9);
+    graphics.fillEllipse(-10 * s, -10.6 * s + baseY, 11 * s, 5 * s);
+    graphics.fillStyle(body, alpha);
+    graphics.fillRoundedRect(-7 * s, -10 * s + baseY, 20 * s, 8.5 * s, 3 * s);
+    graphics.fillStyle(0x070d11, alpha * 0.46);
+    graphics.fillRoundedRect(-2 * s, -9.4 * s + baseY, 5 * s, 7 * s, 2 * s);
+    graphics.lineStyle(Math.max(1, 1.8 * s), body, alpha * 0.98);
     graphics.beginPath();
-    graphics.moveTo(x - 7 * s, baseY - 7 * s);
-    graphics.lineTo(x + 11 * s, baseY - 4 * s);
-    graphics.moveTo(x - 1 * s, baseY - 6 * s);
-    graphics.lineTo(x - 11 * s, baseY + 4 * s);
-    graphics.moveTo(x + 4 * s, baseY - 5 * s);
-    graphics.lineTo(x + 15 * s, baseY + 4 * s);
-    graphics.moveTo(x + 8 * s, baseY - 4 * s);
-    graphics.lineTo(x + 4 * s, baseY + 9 * s);
-    graphics.moveTo(x - 4 * s, baseY - 7 * s);
-    graphics.lineTo(x - 15 * s, baseY - 1 * s);
+    graphics.moveTo(-1 * s, -4 * s + baseY);
+    graphics.lineTo(-12 * s, 3 * s + baseY);
+    graphics.moveTo(2 * s, -3 * s + baseY);
+    graphics.lineTo(13 * s, 3 * s + baseY);
+    graphics.moveTo(6 * s, -2 * s + baseY);
+    graphics.lineTo(1 * s, 8 * s + baseY);
+    graphics.moveTo(-4 * s, -4 * s + baseY);
+    graphics.lineTo(-15 * s, -1 * s + baseY);
     graphics.strokePath();
+    graphics.fillStyle(accent, alpha * 0.75);
+    graphics.fillRoundedRect(6 * s, -5.2 * s + baseY, 10.8 * s, 2 * s, 1 * s);
   }
 
   function drawEnemyFigure(graphics, x, y, color, alpha, scale, pose, progress) {
     const s = scale || 1;
     const t = clamp(progress || 0, 0, 1);
-    if (pose === "crawl") {
-      drawCrawlingFigure(graphics, x, y, color, alpha, s, t);
-      return;
-    }
-    if (pose === "fall") {
+    if (pose === "explode") {
+      const flare = blendColor(palette.blast, palette.shock, 0.42);
+      graphics.fillStyle(flare, alpha * (0.14 + 0.34 * (1 - t)));
+      graphics.fillCircle(x, y - 10 * s, (9 + 20 * t) * s);
+      graphics.lineStyle(Math.max(1, 2 * s), palette.shock, alpha * (1 - t));
+      graphics.strokeCircle(x, y - 10 * s, (12 + 24 * t) * s);
       graphics.save();
-      graphics.translateCanvas(x, y + 4 * s * t);
-      graphics.rotateCanvas(1.2 * t);
-      drawStickFigure(graphics, 0, 0, color, alpha * (1 - t * 0.25), s);
+      graphics.translateCanvas(x, y - 10 * s);
+      graphics.rotateCanvas(t * 1.8);
+      graphics.lineStyle(Math.max(1, 2.2 * s), color, alpha * (1 - t) * 0.62);
+      for (let i = 0; i < 5; i += 1) {
+        const angle = (i / 5) * Math.PI * 2;
+        const inner = 7 * s;
+        const outer = (17 + 15 * t) * s;
+        graphics.lineBetween(Math.cos(angle) * inner, Math.sin(angle) * inner, Math.cos(angle) * outer, Math.sin(angle) * outer);
+      }
       graphics.restore();
       return;
     }
-    if (pose === "explode") {
-      graphics.fillStyle(palette.blast, alpha * (0.24 + 0.18 * (1 - t)));
-      graphics.fillCircle(x, y - 10 * s, (8 + 18 * t) * s);
-      graphics.lineStyle(Math.max(1, 2 * s), palette.shock, alpha * (1 - t));
-      graphics.strokeCircle(x, y - 10 * s, (12 + 24 * t) * s);
-      graphics.lineStyle(Math.max(1, 2.3 * s), color, alpha * (1 - t) * 0.55);
-      graphics.lineBetween(x - 14 * s, y - 18 * s, x + 14 * s, y + 4 * s);
-      graphics.lineBetween(x + 14 * s, y - 18 * s, x - 14 * s, y + 4 * s);
+    graphics.save();
+    graphics.translateCanvas(x, y);
+    if (pose === "crawl") {
+      drawEnemyCrawling(graphics, color, alpha, s, t);
+      graphics.restore();
+      return;
+    }
+    if (pose === "fall") {
+      graphics.translateCanvas(0, 5 * s * t);
+      graphics.rotateCanvas(1.15 * t);
+      drawEnemyStanding(graphics, color, alpha * (1 - t * 0.22), s);
+      graphics.fillStyle(blendColor(color, palette.shock, 0.18), alpha * (1 - t) * 0.56);
+      graphics.fillRoundedRect(-18 * s * t, -4 * s, 12 * s, 2.1 * s, 1 * s);
+      graphics.restore();
       return;
     }
     if (pose === "sink") {
       const fade = alpha * (1 - t);
-      const sinkY = y + 20 * s * t;
-      drawStickFigure(graphics, x, sinkY, color, fade, s);
+      graphics.translateCanvas(0, 18 * s * t);
+      drawEnemyStanding(graphics, color, fade, s);
       graphics.fillStyle(0x24341f, 0.72);
-      graphics.fillEllipse(x, y + 18 * s, 32 * s, 9 * s);
+      graphics.fillEllipse(0, 18 * s, 34 * s, 9 * s);
       graphics.fillStyle(0x5f7a3f, 0.5);
-      graphics.fillEllipse(x + 2 * s, y + 18 * s, 22 * s, 5 * s);
+      graphics.fillEllipse(2 * s, 18 * s, 24 * s, 5 * s);
+      graphics.restore();
       return;
     }
-    drawStickFigure(graphics, x, y, color, alpha, s);
+    drawEnemyStanding(graphics, color, alpha, s);
+    graphics.restore();
+  }
+
+  function updateFxParticles(particles, dt, defaultGravity) {
+    const gravity = defaultGravity || 0;
+    for (const particle of particles) {
+      particle.life -= dt;
+      particle.x += particle.vx * dt;
+      particle.y += particle.vy * dt;
+      particle.vx *= 1 - clamp((particle.drag || 0) * dt, 0, 0.82);
+      particle.vy += (particle.gravity == null ? gravity : particle.gravity) * dt;
+      particle.rotation = (particle.rotation || 0) + (particle.spin || 0) * dt;
+    }
+    return particles.filter((particle) => particle.life > 0);
+  }
+
+  function drawFxParticle(graphics, particle) {
+    const alpha = clamp(particle.life / particle.maxLife, 0, 1);
+    const size = Math.max(0.8, particle.size * (particle.shape === "smoke" ? 0.8 + (1 - alpha) * 0.55 : 1));
+    if (particle.shape === "spark") {
+      graphics.save();
+      graphics.translateCanvas(particle.x, particle.y);
+      graphics.rotateCanvas(particle.rotation || 0);
+      graphics.fillStyle(particle.color, alpha * 0.9);
+      graphics.fillRoundedRect(-size * 1.8, -size * 0.36, size * 3.6, size * 0.72, size * 0.28);
+      graphics.fillStyle(particle.glowColor || blendColor(particle.color, 0xffffff, 0.35), alpha * 0.78);
+      graphics.fillCircle(size * 1.3, 0, size * 0.45);
+      graphics.restore();
+      return;
+    }
+    if (particle.shape === "shard") {
+      graphics.save();
+      graphics.translateCanvas(particle.x, particle.y);
+      graphics.rotateCanvas(particle.rotation || 0);
+      graphics.fillStyle(particle.color, alpha * 0.9);
+      graphics.fillTriangle(-size * 1.2, -size * 0.55, size * 1.4, 0, -size * 1.2, size * 0.55);
+      graphics.restore();
+      return;
+    }
+    graphics.fillStyle(particle.color, particle.shape === "smoke" ? alpha * 0.42 : alpha * 0.95);
+    graphics.fillCircle(particle.x, particle.y, size);
+    if (particle.shape === "smoke") {
+      graphics.lineStyle(1, particle.glowColor || blendColor(particle.color, 0xffffff, 0.18), alpha * 0.18);
+      graphics.strokeCircle(particle.x, particle.y, size * (1.12 + (1 - alpha) * 0.4));
+    } else {
+      graphics.fillStyle(particle.glowColor || blendColor(particle.color, palette.shock, 0.4), alpha * 0.45);
+      graphics.fillCircle(particle.x, particle.y, size * 0.52);
+    }
+  }
+
+  function drawTracerRound(graphics, fromX, fromY, toX, toY, color, alpha, width, headRadius, glowAmount) {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = dx / len;
+    const ny = dy / len;
+    const glow = blendColor(color, 0xffffff, glowAmount == null ? 0.3 : glowAmount);
+    graphics.lineStyle(width + 2, color, alpha * 0.16);
+    graphics.lineBetween(fromX, fromY, toX, toY);
+    graphics.lineStyle(width, glow, alpha * 0.84);
+    graphics.lineBetween(fromX, fromY, toX, toY);
+    graphics.fillStyle(color, alpha * 0.22);
+    graphics.fillCircle(toX - nx * width * 1.6, toY - ny * width * 1.6, Math.max(width * 1.25, (headRadius || width) * 0.72));
+    graphics.fillStyle(glow, alpha);
+    graphics.fillCircle(toX, toY, headRadius || width * 1.2);
+  }
+
+  function drawRocketSprite(graphics, x, y, angle, size, colors, pulse, danger) {
+    const bodyColor = colors.body;
+    const hotColor = colors.hot;
+    const glowColor = colors.glow;
+    const stripeColor = colors.stripe || blendColor(bodyColor, 0xffffff, 0.18);
+    const flameColor = colors.flame || palette.blast;
+    const emberColor = colors.ember || palette.shock;
+    const pulseScale = 1 + Math.sin(pulse || 0) * 0.04;
+    graphics.save();
+    graphics.translateCanvas(x, y);
+    graphics.rotateCanvas(angle);
+    graphics.fillStyle(glowColor, 0.16 + (danger || 0) * 0.18);
+    graphics.fillTriangle(-1.1 * size, -0.64 * size, -1.1 * size, 0.64 * size, 0.98 * size, 0);
+    graphics.fillStyle(bodyColor, 1);
+    graphics.fillRoundedRect(-0.72 * size, -0.29 * size, 1.46 * size, 0.58 * size, 4);
+    graphics.fillStyle(stripeColor, 0.95);
+    graphics.fillRect(-0.08 * size, -0.22 * size, 0.18 * size, 0.44 * size);
+    graphics.fillStyle(hotColor, 1);
+    graphics.fillTriangle(0.96 * size, 0, 0.24 * size, -0.47 * size, 0.24 * size, 0.47 * size);
+    graphics.fillTriangle(-0.18 * size, -0.3 * size, -0.76 * size, -0.78 * size, -0.52 * size, -0.1 * size);
+    graphics.fillTriangle(-0.18 * size, 0.3 * size, -0.76 * size, 0.78 * size, -0.52 * size, 0.1 * size);
+    graphics.fillStyle(flameColor, 0.84 + (danger || 0) * 0.12);
+    graphics.fillTriangle(-0.74 * size, 0, (-1.7 - (danger || 0) * 0.25) * size * pulseScale, -0.32 * size, (-1.7 - (danger || 0) * 0.25) * size * pulseScale, 0.32 * size);
+    graphics.fillStyle(emberColor, 0.72);
+    graphics.fillTriangle(-0.74 * size, 0, (-1.28 - (danger || 0) * 0.18) * size * pulseScale, -0.18 * size, (-1.28 - (danger || 0) * 0.18) * size * pulseScale, 0.18 * size);
+    graphics.fillStyle(colors.core || 0x1c2834, 0.92);
+    graphics.fillRect(-0.34 * size, -0.16 * size, 0.42 * size, 0.32 * size);
+    graphics.restore();
+  }
+
+  function drawBlastWave(graphics, blast, shockColor) {
+    const alpha = clamp(blast.life / blast.maxLife, 0, 1);
+    const progress = 1 - alpha;
+    const color = blast.color;
+    const ringColor = shockColor || blendColor(color, palette.shock, 0.4);
+    graphics.fillStyle(color, alpha * 0.12);
+    graphics.fillCircle(blast.x, blast.y, blast.radius * (0.16 + progress * 0.44));
+    graphics.fillStyle(blendColor(color, palette.shock, 0.5), alpha * 0.18);
+    graphics.fillCircle(blast.x, blast.y, blast.radius * (0.08 + progress * 0.22));
+    graphics.lineStyle(2.4, ringColor, alpha * 0.72);
+    graphics.strokeCircle(blast.x, blast.y, blast.radius * (0.32 + progress * 0.68));
+    graphics.lineStyle(1.2, color, alpha * 0.38);
+    graphics.strokeCircle(blast.x, blast.y, blast.radius * (0.18 + progress * 0.46));
+    graphics.save();
+    graphics.translateCanvas(blast.x, blast.y);
+    graphics.rotateCanvas(progress * 2.6);
+    graphics.lineStyle(1.6, ringColor, alpha * 0.34);
+    for (let i = 0; i < 6; i += 1) {
+      const angle = (i / 6) * Math.PI * 2;
+      const inner = blast.radius * (0.18 + progress * 0.12);
+      const outer = blast.radius * (0.42 + progress * 0.3);
+      graphics.lineBetween(Math.cos(angle) * inner, Math.sin(angle) * inner, Math.cos(angle) * outer, Math.sin(angle) * outer);
+    }
+    graphics.restore();
   }
 
   function blendColor(fromHex, toHex, amount) {
@@ -480,12 +638,12 @@
     }
 
     preload() {
-      this.load.image("bg-bombing", "assets/chapter1-bombing-bg.png?v=flow-fix-1");
-      this.load.image("bg-ship", "assets/chapter2-canal-bg.png?v=flow-fix-4");
-      this.load.image("bg-ship-bank-left", "assets/chapter2-left-bank-scroll.png?v=flow-fix-4");
-      this.load.image("bg-ship-bank-right", "assets/chapter2-right-bank-scroll.png?v=flow-fix-4");
-      this.load.image("ship-player", "assets/chapter2-player-ship.png?v=flow-fix-7");
-      this.load.image("bg-heli", "assets/chapter3-heli-bg.png?v=flow-fix-1");
+      this.load.image("bg-bombing", "assets/chapter1-bombing-bg.png?v=flow-fix-8");
+      this.load.image("bg-ship", "assets/chapter2-canal-bg.png?v=flow-fix-8");
+      this.load.image("bg-ship-bank-left", "assets/chapter2-left-bank-scroll.png?v=flow-fix-8");
+      this.load.image("bg-ship-bank-right", "assets/chapter2-right-bank-scroll.png?v=flow-fix-8");
+      this.load.image("ship-player", "assets/chapter2-player-ship.png?v=flow-fix-8");
+      this.load.image("bg-heli", "assets/chapter3-heli-bg.png?v=flow-fix-8");
     }
 
     create() {
@@ -960,13 +1118,7 @@
         }
       }
 
-      for (const particle of state.fx) {
-        particle.life -= dt;
-        particle.x += particle.vx * dt;
-        particle.y += particle.vy * dt;
-        particle.vy += 110 * dt;
-      }
-      state.fx = state.fx.filter((particle) => particle.life > 0);
+      state.fx = updateFxParticles(state.fx, dt, 110);
       for (const ring of state.blastRings) {
         ring.life -= dt;
       }
@@ -1355,8 +1507,6 @@
         const progress = clamp(target.stateTime / poseDuration, 0, 1);
         const alpha = target.alive ? 1 : pose === "sink" ? Math.max(0.1, 1 - progress) : 0.86;
         const s = target.scale;
-        this.map.fillStyle(0x0b1117, target.alive ? 0.42 : 0.22);
-        this.map.fillEllipse(target.x, target.y + 15 * s, 34 * s, 9 * s);
         if (target.alive) {
           this.map.lineStyle(1, color, 0.42);
           this.map.strokeCircle(target.x, target.y - 8 * s, target.hitRadius);
@@ -1403,17 +1553,10 @@
 
     drawBombingFx() {
       for (const ring of this.bombing.blastRings) {
-        const progress = 1 - ring.life / ring.maxLife;
-        const alpha = clamp(ring.life / ring.maxLife, 0, 1);
-        this.fx.lineStyle(2, palette.shock, alpha * 0.75);
-        this.fx.strokeCircle(ring.x, ring.y, ring.radius * (0.45 + progress * 0.55));
-        this.fx.fillStyle(palette.blast, alpha * 0.12);
-        this.fx.fillCircle(ring.x, ring.y, ring.radius * (0.32 + progress * 0.5));
+        drawBlastWave(this.fx, { ...ring, color: palette.blast }, palette.shock);
       }
       for (const particle of this.bombing.fx) {
-        const alpha = clamp(particle.life / particle.maxLife, 0, 1);
-        this.fx.fillStyle(particle.color, alpha);
-        this.fx.fillCircle(particle.x, particle.y, particle.size * alpha);
+        drawFxParticle(this.fx, particle);
       }
     }
 
@@ -1421,16 +1564,24 @@
       const scale = sizeScale || 1;
       for (let i = 0; i < count; i += 1) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = Phaser.Math.Between(24, 86) * scale;
+        const speed = Phaser.Math.Between(24, 96) * scale;
+        const shapeRoll = Math.random();
+        const life = Phaser.Math.FloatBetween(0.28, 0.66);
         state.fx.push({
           x,
           y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: Phaser.Math.FloatBetween(0.28, 0.62),
-          maxLife: 0.62,
+          life,
+          maxLife: life,
           size: Phaser.Math.Between(2, 5) * scale,
           color,
+          glowColor: shapeRoll < 0.5 ? blendColor(color, palette.shock, 0.3) : blendColor(color, 0xffffff, 0.12),
+          shape: shapeRoll < 0.45 ? "spark" : shapeRoll < 0.75 ? "shard" : "smoke",
+          spin: Phaser.Math.FloatBetween(-7.5, 7.5),
+          gravity: 78 + Phaser.Math.Between(-12, 36),
+          drag: 0.75,
+          rotation: angle,
         });
       }
     }
@@ -1882,12 +2033,7 @@
       }
       state.enemyMissiles = state.enemyMissiles.filter((missile) => !missile.dead);
 
-      for (const particle of state.fx) {
-        particle.life -= dt;
-        particle.x += particle.vx * dt;
-        particle.y += particle.vy * dt;
-      }
-      state.fx = state.fx.filter((particle) => particle.life > 0);
+      state.fx = updateFxParticles(state.fx, dt, 18);
       for (const shot of state.shots) {
         shot.life -= dt;
       }
@@ -1987,8 +2133,8 @@
         y,
         radius,
         color: color || palette.blast,
-        life: 0.34,
-        maxLife: 0.34,
+        life: 0.4,
+        maxLife: 0.4,
       });
       this.shipHitFx(x, y, color || palette.blast, count || 16, scale || 1);
     }
@@ -2259,16 +2405,24 @@
       const scale = sizeScale || 1;
       for (let i = 0; i < total; i += 1) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = Phaser.Math.Between(30, 120) * scale;
+        const speed = Phaser.Math.Between(30, 128) * scale;
+        const roll = Math.random();
+        const life = Phaser.Math.FloatBetween(0.28, 0.52) + 0.08 * scale;
         this.ship.fx.push({
           x,
           y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: 0.32 + 0.16 * scale,
-          maxLife: 0.45,
+          life,
+          maxLife: life,
           size: Phaser.Math.Between(2, 5) * scale,
           color,
+          glowColor: roll < 0.55 ? blendColor(color, palette.shock, 0.45) : blendColor(color, 0xffffff, 0.18),
+          shape: roll < 0.52 ? "spark" : roll < 0.78 ? "shard" : "smoke",
+          gravity: Phaser.Math.FloatBetween(4, 36),
+          drag: 0.5,
+          rotation: angle,
+          spin: Phaser.Math.FloatBetween(-8, 8),
         });
       }
     }
@@ -2414,39 +2568,42 @@
       }
 
       for (const bullet of state.bullets) {
-        this.dynamic.fillStyle(0xffefe0, 1);
-        this.dynamic.fillCircle(bullet.x, bullet.y, 4);
+        const tailX = bullet.x - bullet.vx * 0.022;
+        const tailY = bullet.y - bullet.vy * 0.022;
+        drawTracerRound(this.dynamic, tailX, tailY, bullet.x, bullet.y, 0xffefe0, 0.95, 2.4, 3.4, 0.45);
       }
 
       for (const shot of state.shots) {
         const alpha = clamp(shot.life / shot.maxLife, 0, 1);
         const color = shot.hostile ? 0xff4f96 : shot.missile ? palette.blast : palette.shock;
-        this.dynamic.lineStyle(shot.guided || shot.hostile ? 3 : 2, color, alpha * 0.85);
-        this.dynamic.lineBetween(shot.fromX, shot.fromY, shot.x, shot.y);
-        this.dynamic.fillStyle(color, alpha);
-        this.dynamic.fillCircle(shot.x, shot.y, shot.guided || shot.hostile ? 5 : 3);
+        drawTracerRound(
+          this.dynamic,
+          shot.fromX,
+          shot.fromY,
+          shot.x,
+          shot.y,
+          color,
+          alpha,
+          shot.guided || shot.hostile ? 3.1 : 2.2,
+          shot.guided || shot.hostile ? 4.6 : 3.2,
+          shot.hostile ? 0.42 : 0.3
+        );
       }
 
       for (const bullet of state.playerBullets) {
-        this.dynamic.lineStyle(2, palette.shock, 0.45);
-        this.dynamic.lineBetween(bullet.prevX, bullet.prevY, bullet.x, bullet.y);
-        this.dynamic.fillStyle(palette.shock, 1);
-        this.dynamic.fillCircle(bullet.x, bullet.y, 3.4);
+        drawTracerRound(this.dynamic, bullet.prevX, bullet.prevY, bullet.x, bullet.y, palette.shock, 0.95, 2.1, 3.1, 0.36);
       }
 
       for (const missile of state.supportMissiles) {
-        this.dynamic.save();
-        this.dynamic.translateCanvas(missile.x, missile.y);
-        this.dynamic.rotateCanvas(missile.angle);
-        this.dynamic.fillStyle(palette.blast, 0.22);
-        this.dynamic.fillTriangle(-11, -6, -11, 6, 7, 0);
-        this.dynamic.fillStyle(0xdde8ee, 1);
-        this.dynamic.fillRoundedRect(-8, -3, 16, 6, 3);
-        this.dynamic.fillStyle(0xffcc4d, 1);
-        this.dynamic.fillTriangle(8, 0, 1, -5, 1, 5);
-        this.dynamic.fillStyle(0xff6b5d, 0.82);
-        this.dynamic.fillTriangle(-10, 0, -18, -4, -18, 4);
-        this.dynamic.restore();
+        drawRocketSprite(this.dynamic, missile.x, missile.y, missile.angle, Math.max(8, missile.size || 9), {
+          body: 0xdde8ee,
+          hot: 0xffd058,
+          glow: blendColor(palette.blast, palette.shock, 0.26),
+          stripe: 0x7ec8ff,
+          flame: 0xff7c56,
+          ember: palette.shock,
+          core: 0x23354a,
+        }, missile.life * 8, 0.22);
       }
 
       for (const missile of state.enemyMissiles) {
@@ -2454,31 +2611,21 @@
         const hotColor = blendColor(0xff69b4, 0xff3f74, missile.danger || 0);
         const bodyColor = blendColor(0x4b153a, 0xffb0d6, (missile.danger || 0) * 0.74);
         const glowColor = blendColor(0xb33b74, 0xff4f96, missile.danger || 0);
-        this.dynamic.save();
-        this.dynamic.translateCanvas(missile.x, missile.y);
-        this.dynamic.rotateCanvas(missile.angle);
-        this.dynamic.fillStyle(glowColor, 0.18 + (missile.danger || 0) * 0.16);
-        this.dynamic.fillTriangle(-0.98 * missileSize, -0.56 * missileSize, -0.98 * missileSize, 0.56 * missileSize, 0.92 * missileSize, 0);
-        this.dynamic.fillStyle(bodyColor, 1);
-        this.dynamic.fillRoundedRect(-0.62 * missileSize, -0.24 * missileSize, 1.28 * missileSize, 0.48 * missileSize, 4);
-        this.dynamic.fillStyle(hotColor, 1);
-        this.dynamic.fillTriangle(0.9 * missileSize, 0, 0.26 * missileSize, -0.44 * missileSize, 0.26 * missileSize, 0.44 * missileSize);
-        this.dynamic.fillStyle(0xff7c56, 0.82 + (missile.danger || 0) * 0.14);
-        this.dynamic.fillTriangle(-0.74 * missileSize, 0, -1.52 * missileSize, -0.28 * missileSize, -1.52 * missileSize, 0.28 * missileSize);
-        this.dynamic.fillStyle(0x20303e, 0.9);
-        this.dynamic.fillRect(-0.28 * missileSize, -0.14 * missileSize, 0.34 * missileSize, 0.28 * missileSize);
-        this.dynamic.restore();
-        this.dynamic.lineStyle(1.5, glowColor, 0.28 + (missile.danger || 0) * 0.28);
+        drawRocketSprite(this.dynamic, missile.x, missile.y, missile.angle, missileSize, {
+          body: bodyColor,
+          hot: hotColor,
+          glow: glowColor,
+          stripe: blendColor(bodyColor, 0xffffff, 0.18),
+          flame: 0xff7c56,
+          ember: blendColor(palette.shock, 0xffd18a, 0.25),
+          core: 0x20303e,
+        }, missile.pulse, missile.danger || 0);
+        this.dynamic.lineStyle(1.6, glowColor, 0.28 + (missile.danger || 0) * 0.28);
         this.dynamic.strokeCircle(missile.x, missile.y, missileSize + 3 + Math.sin(missile.pulse || 0) * 1.2);
       }
 
       for (const blast of state.blasts) {
-        const alpha = clamp(blast.life / blast.maxLife, 0, 1);
-        const progress = 1 - alpha;
-        this.fx.lineStyle(2, blast.color, alpha * 0.7);
-        this.fx.strokeCircle(blast.x, blast.y, blast.radius * (0.32 + progress * 0.68));
-        this.fx.fillStyle(blast.color, alpha * 0.12);
-        this.fx.fillCircle(blast.x, blast.y, blast.radius * (0.18 + progress * 0.42));
+        drawBlastWave(this.fx, blast);
       }
 
       const ship = this.shipPosition();
@@ -2525,9 +2672,7 @@
       this.dynamic.restore();
 
       for (const particle of state.fx) {
-        const alpha = clamp(particle.life / particle.maxLife, 0, 1);
-        this.fx.fillStyle(particle.color, alpha);
-        this.fx.fillCircle(particle.x, particle.y, particle.size * alpha);
+        drawFxParticle(this.fx, particle);
       }
     }
 
@@ -2849,12 +2994,7 @@
         shot.life -= dt;
       }
       state.shots = state.shots.filter((shot) => shot.life > 0);
-      for (const particle of state.fx) {
-        particle.life -= dt;
-        particle.x += particle.vx * dt;
-        particle.y += particle.vy * dt;
-      }
-      state.fx = state.fx.filter((particle) => particle.life > 0);
+      state.fx = updateFxParticles(state.fx, dt, 10);
 
       if (state.timeLeft <= 0) {
         state.finished = true;
@@ -2895,16 +3035,24 @@
     heliBurst(x, y, color, count) {
       for (let i = 0; i < count; i += 1) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = Phaser.Math.Between(22, 110);
+        const speed = Phaser.Math.Between(22, 118);
+        const roll = Math.random();
+        const life = Phaser.Math.FloatBetween(0.32, 0.56);
         this.heli.fx.push({
           x,
           y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: 0.48,
-          maxLife: 0.48,
+          life,
+          maxLife: life,
           size: Phaser.Math.Between(2, 6),
           color,
+          glowColor: roll < 0.58 ? blendColor(color, palette.shock, 0.45) : blendColor(color, 0xffffff, 0.18),
+          shape: roll < 0.52 ? "spark" : roll < 0.78 ? "shard" : "smoke",
+          gravity: Phaser.Math.FloatBetween(0, 28),
+          drag: 0.52,
+          rotation: angle,
+          spin: Phaser.Math.FloatBetween(-7, 7),
         });
       }
     }
@@ -2963,20 +3111,15 @@
         const hotColor = blendColor(0xffc94b, 0xff5a42, missile.danger || 0);
         const bodyColor = blendColor(0xdde8ee, 0xffb16a, (missile.danger || 0) * 0.78);
         const glowColor = blendColor(palette.shock, palette.blast, missile.danger || 0);
-        this.dynamic.save();
-        this.dynamic.translateCanvas(missile.x, missile.y);
-        this.dynamic.rotateCanvas(missile.angle);
-        this.dynamic.fillStyle(glowColor, 0.18 + (missile.danger || 0) * 0.18);
-        this.dynamic.fillTriangle(-1.05 * missileSize, -0.62 * missileSize, -1.05 * missileSize, 0.62 * missileSize, 0.94 * missileSize, 0);
-        this.dynamic.fillStyle(bodyColor, 1);
-        this.dynamic.fillRoundedRect(-0.68 * missileSize, -0.28 * missileSize, 1.42 * missileSize, 0.56 * missileSize, 4);
-        this.dynamic.fillStyle(hotColor, 1);
-        this.dynamic.fillTriangle(0.92 * missileSize, 0, 0.28 * missileSize, -0.46 * missileSize, 0.28 * missileSize, 0.46 * missileSize);
-        this.dynamic.fillStyle(0xff7c56, 0.82 + (missile.danger || 0) * 0.14);
-        this.dynamic.fillTriangle(-0.82 * missileSize, 0, -1.68 * missileSize, -0.32 * missileSize, -1.68 * missileSize, 0.32 * missileSize);
-        this.dynamic.fillStyle(0x253847, 0.92);
-        this.dynamic.fillRect(-0.38 * missileSize, -0.18 * missileSize, 0.46 * missileSize, 0.36 * missileSize);
-        this.dynamic.restore();
+        drawRocketSprite(this.dynamic, missile.x, missile.y, missile.angle, missileSize, {
+          body: bodyColor,
+          hot: hotColor,
+          glow: glowColor,
+          stripe: blendColor(bodyColor, 0xffffff, 0.2),
+          flame: 0xff7c56,
+          ember: palette.shock,
+          core: 0x253847,
+        }, missile.pulse, missile.danger || 0);
         this.dynamic.lineStyle(1.5, glowColor, 0.35 + (missile.danger || 0) * 0.3);
         this.dynamic.strokeCircle(missile.x, missile.y, missileSize + 4 + Math.sin(missile.pulse || 0) * 1.4);
       }
@@ -2986,11 +3129,9 @@
         const progress = 1 - alpha;
         const bulletX = shot.fromX + (shot.x - shot.fromX) * progress;
         const bulletY = shot.fromY + (shot.y - shot.fromY) * progress;
-        this.dynamic.lineStyle(shot.missile ? 3 : 2, shot.missile ? palette.blast : palette.shock, alpha * 0.85);
-        this.dynamic.lineBetween(shot.fromX, shot.fromY, bulletX, bulletY);
-        this.dynamic.fillStyle(shot.missile ? palette.blast : palette.shock, alpha);
-        this.dynamic.fillCircle(bulletX, bulletY, shot.missile ? 5 : 3);
-        this.dynamic.lineStyle(shot.missile ? 3 : 2, shot.missile ? palette.blast : palette.shock, alpha * 0.6);
+        const color = shot.missile ? palette.blast : palette.shock;
+        drawTracerRound(this.dynamic, shot.fromX, shot.fromY, bulletX, bulletY, color, alpha, shot.missile ? 3.2 : 2.1, shot.missile ? 4.8 : 3.1, shot.missile ? 0.36 : 0.26);
+        this.dynamic.lineStyle(1.4, color, alpha * 0.38);
         this.dynamic.strokeCircle(shot.x, shot.y, shot.radius * (1 - alpha * 0.35));
       }
 
@@ -3020,9 +3161,7 @@
       this.dynamic.fillCircle(heli.x, heli.y + 4, 6);
 
       for (const particle of state.fx) {
-        const alpha = clamp(particle.life / particle.maxLife, 0, 1);
-        this.fx.fillStyle(particle.color, alpha);
-        this.fx.fillCircle(particle.x, particle.y, particle.size * alpha);
+        drawFxParticle(this.fx, particle);
       }
     }
 
