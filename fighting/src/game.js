@@ -413,6 +413,17 @@
     drawStickFigure(graphics, x, y, color, alpha, s);
   }
 
+  function blendColor(fromHex, toHex, amount) {
+    const t = clamp(amount, 0, 1);
+    const color = Phaser.Display.Color.Interpolate.ColorWithColor(
+      Phaser.Display.Color.ValueToColor(fromHex),
+      Phaser.Display.Color.ValueToColor(toHex),
+      100,
+      Math.round(t * 100)
+    );
+    return Phaser.Display.Color.GetColor(color.r, color.g, color.b);
+  }
+
   function drawPlane(graphics, x, y, scale, banking) {
     graphics.save();
     graphics.translateCanvas(x, y);
@@ -1850,14 +1861,17 @@
       });
 
       for (const missile of state.missiles) {
+        const missileRadius = (missile.displaySize || missile.size || 12) * 0.5;
         const distance = isMissile
           ? Math.hypot(missile.x - x, missile.y - y)
           : pointSegmentDistance(missile.x, missile.y, fromX, fromY, x, y);
-        if (!missile.dead && distance <= radius + missile.size * 0.5) {
+        if (!missile.dead && distance <= radius + missileRadius) {
           missile.dead = true;
-          state.score += 80;
+          const reward = 55 + Math.round((missile.displaySize || missile.size || 12) * 3 + (missile.danger || 0) * 40);
+          state.score += reward;
           this.score = state.score;
-          this.heliBurst(missile.x, missile.y, palette.shock, 12);
+          this.heliBurst(missile.x, missile.y, blendColor(palette.shock, palette.blast, missile.danger || 0.45), 12);
+          this.showMessage(`Missile down +${reward}`);
         }
       }
 
@@ -1963,12 +1977,19 @@
           hole.missileCooldown -= dt;
           if (hole.timer > 5 && hole.missileCooldown <= 0) {
             const heli = this.heliPosition();
+            const baseSize = 9 + state.levelIndex * 0.7 + Phaser.Math.FloatBetween(0, 1.6);
+            const maxSize = 18 + state.levelIndex * 1.6 + Phaser.Math.FloatBetween(0.4, 2.6);
             state.missiles.push({
               x: hole.x,
               y: hole.y + hole.r * 0.2,
               angle: Math.atan2(heli.y - hole.y, heli.x - hole.x),
               speed: 116 + state.levelIndex * 14,
-              size: 10,
+              size: baseSize,
+              baseSize,
+              maxSize,
+              displaySize: baseSize,
+              pulse: Math.random() * Math.PI * 2,
+              danger: 0,
               life: 0,
               dead: false,
             });
@@ -1980,7 +2001,18 @@
       for (const missile of state.missiles) {
         missile.life += dt;
         missile.speed += 7 * dt;
-        missile.size = Math.min(18, missile.size + 2.4 * dt);
+        missile.pulse += dt * (5.8 + state.levelIndex * 0.5);
+        missile.size = Math.min(missile.maxSize || 18, missile.size + (2.25 + state.levelIndex * 0.22) * dt);
+        missile.displaySize = clamp(
+          missile.size + Math.sin(missile.pulse) * 1.15,
+          (missile.baseSize || missile.size) * 0.92,
+          (missile.maxSize || missile.size) + 0.9
+        );
+        missile.danger = clamp(
+          ((missile.displaySize || missile.size) - (missile.baseSize || missile.size)) / Math.max(1, (missile.maxSize || missile.size) - (missile.baseSize || missile.size)),
+          0,
+          1
+        );
         const heli = this.heliPosition();
         const targetAngle = Math.atan2(heli.y - missile.y, heli.x - missile.x);
         missile.angle = turnToward(missile.angle, targetAngle, 1.45 * dt);
@@ -2113,20 +2145,26 @@
       }
 
       for (const missile of state.missiles) {
+        const missileSize = missile.displaySize || missile.size || 12;
+        const hotColor = blendColor(0xffc94b, 0xff5a42, missile.danger || 0);
+        const bodyColor = blendColor(0xdde8ee, 0xffb16a, (missile.danger || 0) * 0.78);
+        const glowColor = blendColor(palette.shock, palette.blast, missile.danger || 0);
         this.dynamic.save();
         this.dynamic.translateCanvas(missile.x, missile.y);
         this.dynamic.rotateCanvas(missile.angle);
-        this.dynamic.fillStyle(palette.blast, 0.28);
-        this.dynamic.fillTriangle(-14, -9, -14, 9, 10, 0);
-        this.dynamic.fillStyle(0xdde8ee, 1);
-        this.dynamic.fillRoundedRect(-10, -4, 22, 8, 4);
-        this.dynamic.fillStyle(palette.pod, 1);
-        this.dynamic.fillTriangle(14, 0, 4, -7, 4, 7);
-        this.dynamic.fillStyle(0xff6b5d, 0.85);
-        this.dynamic.fillTriangle(-13, 0, -25, -5, -25, 5);
+        this.dynamic.fillStyle(glowColor, 0.18 + (missile.danger || 0) * 0.18);
+        this.dynamic.fillTriangle(-1.05 * missileSize, -0.62 * missileSize, -1.05 * missileSize, 0.62 * missileSize, 0.94 * missileSize, 0);
+        this.dynamic.fillStyle(bodyColor, 1);
+        this.dynamic.fillRoundedRect(-0.68 * missileSize, -0.28 * missileSize, 1.42 * missileSize, 0.56 * missileSize, 4);
+        this.dynamic.fillStyle(hotColor, 1);
+        this.dynamic.fillTriangle(0.92 * missileSize, 0, 0.28 * missileSize, -0.46 * missileSize, 0.28 * missileSize, 0.46 * missileSize);
+        this.dynamic.fillStyle(0xff7c56, 0.82 + (missile.danger || 0) * 0.14);
+        this.dynamic.fillTriangle(-0.82 * missileSize, 0, -1.68 * missileSize, -0.32 * missileSize, -1.68 * missileSize, 0.32 * missileSize);
+        this.dynamic.fillStyle(0x253847, 0.92);
+        this.dynamic.fillRect(-0.38 * missileSize, -0.18 * missileSize, 0.46 * missileSize, 0.36 * missileSize);
         this.dynamic.restore();
-        this.dynamic.lineStyle(1, palette.shock, 0.42);
-        this.dynamic.strokeCircle(missile.x, missile.y, missile.size + 5);
+        this.dynamic.lineStyle(1.5, glowColor, 0.35 + (missile.danger || 0) * 0.3);
+        this.dynamic.strokeCircle(missile.x, missile.y, missileSize + 4 + Math.sin(missile.pulse || 0) * 1.4);
       }
 
       for (const shot of state.shots) {
