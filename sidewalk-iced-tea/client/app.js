@@ -79,6 +79,7 @@ const runtime = {
   assets: new Map(),
   db: null,
   storageMode: "indexeddb",
+  sessionStartedAt: Date.now(),
   lastFrame: 0,
   accumulator: 0,
   autoSaveTimer: 0,
@@ -192,7 +193,6 @@ function createDefaultState() {
     weatherState: "clear",
     weatherRemaining: 0,
     nextWeatherRollIn: randomInRange(...WEATHER_WINDOW),
-    sessionStartedAt: now,
     lastSavedAt: now,
     lastSimulatedAt: now,
     audioUnlocked: false,
@@ -234,7 +234,6 @@ function restoreState(saved) {
     weatherState: saved.weatherState === "rain" ? "rain" : "clear",
     weatherRemaining: asNumber(saved.weatherRemaining, base.weatherRemaining),
     nextWeatherRollIn: asNumber(saved.nextWeatherRollIn, base.nextWeatherRollIn),
-    sessionStartedAt: asNumber(saved.sessionStartedAt, base.sessionStartedAt),
     lastSavedAt: asNumber(saved.lastSavedAt, base.lastSavedAt),
     lastSimulatedAt: Date.now(),
     audioUnlocked: Boolean(saved.audioUnlocked),
@@ -785,6 +784,10 @@ function handleStartButton() {
     return;
   }
 
+  if (runtime.mode === "title") {
+    runtime.sessionStartedAt = Date.now();
+  }
+
   runtime.mode = "playing";
   runtime.lastFrame = 0;
   runtime.accumulator = 0;
@@ -879,6 +882,7 @@ async function resetSave() {
   }
 
   gameState = createDefaultState();
+  runtime.sessionStartedAt = Date.now();
   runtime.mode = "title";
   runtime.lastFrame = 0;
   runtime.accumulator = 0;
@@ -1201,7 +1205,7 @@ function updateHud() {
   ui.tablesValue.textContent = `${busyTables} / ${TABLE_LAYOUT.length}`;
   ui.flowValue.textContent = `${gameState.totalServed} served / ${gameState.totalMissed} missed`;
   ui.saveValue.textContent = runtime.saveStatus;
-  ui.sessionValue.textContent = formatElapsed(Date.now() - gameState.sessionStartedAt);
+  ui.sessionValue.textContent = formatElapsed(Date.now() - runtime.sessionStartedAt);
   ui.pauseButton.innerHTML =
     runtime.mode === "paused"
       ? 'Resume<small>back to service</small>'

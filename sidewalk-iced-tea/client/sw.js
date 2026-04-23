@@ -1,4 +1,4 @@
-const CACHE_NAME = "sidewalk-iced-tea-planb-v1";
+const CACHE_NAME = "sidewalk-iced-tea-planb-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -73,8 +73,10 @@ self.addEventListener("fetch", (event) => {
 
       return fetch(event.request)
         .then(async (response) => {
-          const cache = await caches.open(CACHE_NAME);
-          cache.put(event.request, response.clone());
+          if (shouldCacheResponse(event.request, response)) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(event.request, response.clone());
+          }
           return response;
         })
         .catch(() => {
@@ -87,3 +89,16 @@ self.addEventListener("fetch", (event) => {
     }),
   );
 });
+
+function shouldCacheResponse(request, response) {
+  if (!response.ok || response.type !== "basic") {
+    return false;
+  }
+
+  const contentType = response.headers.get("Content-Type") || "";
+  if (request.destination !== "document" && contentType.includes("text/html")) {
+    return false;
+  }
+
+  return true;
+}
