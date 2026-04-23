@@ -484,6 +484,7 @@
       this.load.image("bg-ship", "assets/chapter2-canal-bg.png?v=flow-fix-4");
       this.load.image("bg-ship-bank-left", "assets/chapter2-left-bank-scroll.png?v=flow-fix-4");
       this.load.image("bg-ship-bank-right", "assets/chapter2-right-bank-scroll.png?v=flow-fix-4");
+      this.load.image("ship-player", "assets/chapter2-player-ship.png?v=flow-fix-7");
       this.load.image("bg-heli", "assets/chapter3-heli-bg.png?v=flow-fix-1");
     }
 
@@ -512,6 +513,11 @@
       this.setChapterBackground("bombing");
       this.bg = this.add.graphics();
       this.map = this.add.graphics();
+      this.shipSprite = this.add.image(-200, -200, "ship-player");
+      this.shipSprite.setOrigin(0.5, 0.5);
+      this.shipSprite.setDisplaySize(102, 153);
+      this.shipSprite.setVisible(false);
+      this.shipSprite.setDepth(0);
       this.dynamic = this.add.graphics();
       this.fx = this.add.graphics();
       this.trajectory = this.add.graphics();
@@ -540,6 +546,9 @@
         Object.values(this.shipBankScrolls).forEach((image) => {
           image.setVisible(mode === "ship");
         });
+      }
+      if (this.shipSprite) {
+        this.shipSprite.setVisible(mode === "ship");
       }
     }
 
@@ -2483,6 +2492,7 @@
         this.dynamic.lineStyle(1.5, 0x7ef4ff, 0.26);
         this.dynamic.strokeCircle(state.autoTarget.targetX, state.autoTarget.targetY, state.autoTarget.kind === "launcher" ? 22 : state.autoTarget.kind === "gun" ? 18 : 14);
       }
+      this.shipSprite.setPosition(ship.x, ship.y + 6);
       this.dynamic.save();
       this.dynamic.translateCanvas(ship.x, ship.y);
       const shieldColors = [0x9bd5ff, 0xffcc4d, 0x5ee3a2];
@@ -2512,12 +2522,6 @@
         this.dynamic.lineStyle(1, color, 0.42);
         this.dynamic.strokeRoundedRect(x, -74, 34, 8, 4);
       }
-      this.dynamic.fillStyle(0xd9e6ec, 1);
-      this.dynamic.fillTriangle(0, -48, -26, 34, 26, 34);
-      this.dynamic.fillStyle(0x2d6179, 1);
-      this.dynamic.fillRoundedRect(-12, -10, 24, 30, 7);
-      this.dynamic.fillStyle(0xff6b5d, 0.9);
-      this.dynamic.fillCircle(0, 4, 8);
       this.dynamic.restore();
 
       for (const particle of state.fx) {
