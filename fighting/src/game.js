@@ -26,6 +26,7 @@
     bombSummary: document.getElementById("bomb-summary"),
     scopeButtons: Array.from(document.querySelectorAll("[data-scope]")),
     typeButtons: Array.from(document.querySelectorAll("[data-bomb-type]")),
+    pathButtons: Array.from(document.querySelectorAll("[data-bomb-path]")),
     fuse: document.getElementById("fuse-input"),
     fuseOut: document.getElementById("fuse-output"),
     blast: document.getElementById("blast-input"),
@@ -79,6 +80,7 @@
 
   const DEFAULT_BOMB_CONFIG = {
     type: "drill",
+    path: "arc",
     fuse: 1.35,
     blastRadius: 42,
     drillWalls: 3,
@@ -89,6 +91,13 @@
     drill: "Drill",
     bounce: "Bounce",
     timer: "Timer",
+  };
+
+  const BOMB_PATH_LABELS = {
+    arc: "Arc",
+    drop: "Drop",
+    hook: "Hook",
+    zigzag: "Z path",
   };
 
   const CHAPTER1_LEVELS = [
@@ -251,6 +260,7 @@
   function cloneBombConfig(config) {
     return {
       type: config.type,
+      path: config.path,
       fuse: config.fuse,
       blastRadius: config.blastRadius,
       drillWalls: config.drillWalls,
@@ -260,6 +270,88 @@
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+  }
+
+  function approachValue(current, target, amount) {
+    return current + (target - current) * clamp(amount, 0, 1);
+  }
+
+  function createBombMotionState(origin, angleDeg, speed) {
+    const radians = Phaser.Math.DegToRad(angleDeg);
+    const baseVx = origin.speed + Math.sin(radians) * speed * 0.68;
+    const baseVy = Math.cos(radians) * speed;
+    const forward = baseVx >= 0 ? 1 : -1;
+    return {
+      x: origin.x,
+      y: origin.y + 18,
+      prevX: origin.x,
+      prevY: origin.y + 18,
+      vx: baseVx,
+      vy: baseVy,
+      baseVx,
+      baseVy,
+      forward,
+      releaseY: origin.y + 18,
+      pathAge: 0,
+      pathPhase: 0,
+      pathPhaseTime: 0,
+      pathCruiseSpeed: Math.max(Math.abs(baseVx) * 1.08, origin.speed + speed * 0.3),
+      pathDiveSpeed: Math.max(210, Math.abs(baseVy) * 0.94 + 34),
+    };
+  }
+
+  function advanceBombPathMotion(pod, dt) {
+    const path = BOMB_PATH_LABELS[pod.config.path] ? pod.config.path : "arc";
+    const steer = 4.8 * dt;
+    pod.pathAge += dt;
+    pod.pathPhaseTime += dt;
+    if (pod.bounces > 0) {
+      pod.vy += GRAVITY * dt;
+      return;
+    }
+    if (path === "drop") {
+      pod.vx = approachValue(pod.vx, pod.forward * Math.max(18, Math.abs(pod.baseVx) * 0.08), steer * 1.25);
+      pod.vy += GRAVITY * dt * 1.22;
+      return;
+    }
+    if (path === "hook") {
+      if (pod.pathPhase === 0 && (pod.pathAge >= 0.2 || pod.y >= pod.releaseY + 58)) {
+        pod.pathPhase = 1;
+        pod.pathPhaseTime = 0;
+      }
+      if (pod.pathPhase === 0) {
+        pod.vx = approachValue(pod.vx, pod.forward * Math.max(42, pod.pathCruiseSpeed * 0.4), steer * 0.72);
+        pod.vy += GRAVITY * dt * 1.18;
+      } else {
+        pod.vx = approachValue(pod.vx, pod.forward * pod.pathCruiseSpeed * 1.08, steer * 1.55);
+        pod.vy = approachValue(pod.vy, 14, steer * 1.8);
+        pod.vy += 20 * dt;
+      }
+      return;
+    }
+    if (path === "zigzag") {
+      if (pod.pathPhase === 0 && (pod.pathAge >= 0.16 || pod.y >= pod.releaseY + 40)) {
+        pod.pathPhase = 1;
+        pod.pathPhaseTime = 0;
+      } else if (pod.pathPhase === 1 && pod.pathPhaseTime >= 0.28) {
+        pod.pathPhase = 2;
+        pod.pathPhaseTime = 0;
+      }
+      if (pod.pathPhase === 0) {
+        pod.vx = approachValue(pod.vx, pod.forward * pod.pathCruiseSpeed * 0.82, steer * 0.9);
+        pod.vy += GRAVITY * dt * 1.14;
+      } else if (pod.pathPhase === 1) {
+        pod.vx = approachValue(pod.vx, pod.forward * pod.pathCruiseSpeed * 1.16, steer * 1.6);
+        pod.vy = approachValue(pod.vy, 8, steer * 2);
+        pod.vy += 10 * dt;
+      } else {
+        pod.vx = approachValue(pod.vx, pod.forward * pod.pathCruiseSpeed * 0.9, steer * 1.1);
+        pod.vy = approachValue(pod.vy, pod.pathDiveSpeed * 0.9, steer * 1.3);
+        pod.vy += 26 * dt;
+      }
+      return;
+    }
+    pod.vy += GRAVITY * dt;
   }
 
   function circleRectIntersects(cx, cy, radius, rect) {
@@ -638,12 +730,12 @@
     }
 
     preload() {
-      this.load.image("bg-bombing", "assets/chapter1-bombing-bg.png?v=flow-fix-8");
-      this.load.image("bg-ship", "assets/chapter2-canal-bg.png?v=flow-fix-8");
-      this.load.image("bg-ship-bank-left", "assets/chapter2-left-bank-scroll.png?v=flow-fix-8");
-      this.load.image("bg-ship-bank-right", "assets/chapter2-right-bank-scroll.png?v=flow-fix-8");
-      this.load.image("ship-player", "assets/chapter2-player-ship.png?v=flow-fix-8");
-      this.load.image("bg-heli", "assets/chapter3-heli-bg.png?v=flow-fix-8");
+      this.load.image("bg-bombing", "assets/chapter1-bombing-bg.png?v=flow-fix-9");
+      this.load.image("bg-ship", "assets/chapter2-canal-bg.png?v=flow-fix-9");
+      this.load.image("bg-ship-bank-left", "assets/chapter2-left-bank-scroll.png?v=flow-fix-9");
+      this.load.image("bg-ship-bank-right", "assets/chapter2-right-bank-scroll.png?v=flow-fix-9");
+      this.load.image("ship-player", "assets/chapter2-player-ship.png?v=flow-fix-9");
+      this.load.image("bg-heli", "assets/chapter3-heli-bg.png?v=flow-fix-9");
     }
 
     create() {
@@ -742,6 +834,9 @@
       });
       els.typeButtons.forEach((button) => {
         button.addEventListener("click", () => this.setBombType(button.dataset.bombType));
+      });
+      els.pathButtons.forEach((button) => {
+        button.addEventListener("click", () => this.setBombPath(button.dataset.bombPath));
       });
       [els.fuse, els.blast, els.drillWalls, els.bounceCount].forEach((input) => {
         ["input", "change"].forEach((eventName) => {
@@ -958,6 +1053,12 @@
       this.syncBombUi(config);
     }
 
+    setBombPath(path) {
+      const config = this.getEditableBombConfig();
+      config.path = BOMB_PATH_LABELS[path] ? path : "arc";
+      this.syncBombUi(config);
+    }
+
     applyBombInputs() {
       const config = this.getEditableBombConfig();
       config.fuse = Number(els.fuse.value);
@@ -968,6 +1069,8 @@
     }
 
     syncBombUi(config) {
+      config.type = BOMB_LABELS[config.type] ? config.type : "drill";
+      config.path = BOMB_PATH_LABELS[config.path] ? config.path : "arc";
       els.fuse.value = `${config.fuse}`;
       els.blast.value = `${config.blastRadius}`;
       els.drillWalls.value = `${config.drillWalls}`;
@@ -979,6 +1082,9 @@
       els.typeButtons.forEach((button) => {
         button.classList.toggle("is-active", button.dataset.bombType === config.type);
       });
+      els.pathButtons.forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.bombPath === config.path);
+      });
       els.scopeButtons.forEach((button) => {
         button.classList.toggle("is-active", button.dataset.scope === this.bombScope);
       });
@@ -989,7 +1095,7 @@
           : config.type === "drill"
             ? `${config.drillWalls} wall${config.drillWalls === 1 ? "" : "s"}`
             : `${config.fuse.toFixed(2)} s`;
-      els.bombSummary.textContent = `${scope}: ${BOMB_LABELS[config.type]}, ${detail}, blast ${config.blastRadius}`;
+      els.bombSummary.textContent = `${scope}: ${BOMB_LABELS[config.type]}, ${BOMB_PATH_LABELS[config.path]}, ${detail}, blast ${config.blastRadius}`;
     }
 
     loadBombingLevel(levelIndex, carryScore, message) {
@@ -1029,16 +1135,11 @@
     releasePod() {
       const angleDeg = Number(els.angle.value);
       const speed = Number(els.speed.value);
-      const radians = Phaser.Math.DegToRad(angleDeg);
       const level = this.bombing.level;
       const bombConfig = this.getShotBombConfig();
+      const motion = createBombMotionState(this.plane, angleDeg, speed);
       const pod = {
-        x: this.plane.x,
-        y: this.plane.y + 18,
-        prevX: this.plane.x,
-        prevY: this.plane.y + 18,
-        vx: this.plane.speed + Math.sin(radians) * speed * 0.68,
-        vy: Math.cos(radians) * speed,
+        ...motion,
         radius: level.podRadius,
         drillRadius: level.drillRadius,
         energy: speed * 0.78,
@@ -1072,7 +1173,7 @@
         pod.prevY = pod.y;
         pod.fuseLeft -= dt;
         pod.groundCooldown = Math.max(0, pod.groundCooldown - dt);
-        pod.vy += GRAVITY * dt;
+        advanceBombPathMotion(pod, dt);
         pod.x += pod.vx * dt;
         pod.y += pod.vy * dt;
         pod.trail.push({ x: pod.x, y: pod.y });
@@ -1409,18 +1510,23 @@
       const speed = Number(els.speed.value);
       const futureX = this.wrapPlaneX(this.plane.x + this.plane.speed * delay);
       const futureY = this.plane.y + 18;
-      const radians = Phaser.Math.DegToRad(angleDeg);
+      const config = this.getEditableBombConfig();
+      const preview = {
+        ...createBombMotionState({ x: futureX, y: this.plane.y, speed: this.plane.speed }, angleDeg, speed),
+        config,
+        bounces: 0,
+      };
       let x = futureX;
       let y = futureY;
-      let vx = this.plane.speed + Math.sin(radians) * speed * 0.68;
-      let vy = Math.cos(radians) * speed;
       this.trajectory.lineStyle(1, palette.pod, 0.28);
       this.trajectory.beginPath();
       this.trajectory.moveTo(x, y);
       for (let i = 0; i < 42; i += 1) {
-        vy += GRAVITY * 0.035;
-        x += vx * 0.035;
-        y += vy * 0.035;
+        advanceBombPathMotion(preview, 0.035);
+        preview.x += preview.vx * 0.035;
+        preview.y += preview.vy * 0.035;
+        x = preview.x;
+        y = preview.y;
         if (i % 2 === 0) {
           this.trajectory.lineTo(x, y);
         } else {

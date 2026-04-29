@@ -296,6 +296,10 @@ button svg {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.segmented-paths {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .segment {
   height: 34px;
   min-width: 0;
@@ -551,12 +555,16 @@ button svg {
     top: 58px;
     bottom: auto;
     width: auto;
-    max-height: 216px;
+    max-height: min(320px, calc(100dvh - 150px));
     overflow: auto;
   }
 
   .bomb-panel .control {
     grid-column: auto;
+  }
+
+  .segmented-paths {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .message {

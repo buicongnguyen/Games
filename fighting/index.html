@@ -90,6 +90,13 @@
             <button class="segment" type="button" data-bomb-type="timer">Timer</button>
           </div>
 
+          <div class="segmented segmented-paths" role="group" aria-label="Bomb trajectory">
+            <button class="segment is-active" type="button" data-bomb-path="arc">Arc</button>
+            <button class="segment" type="button" data-bomb-path="drop">Drop</button>
+            <button class="segment" type="button" data-bomb-path="hook">Hook</button>
+            <button class="segment" type="button" data-bomb-path="zigzag">Z path</button>
+          </div>
+
           <label class="control">
             <span>Explode delay</span>
             <input id="fuse-input" type="range" min="0.35" max="3" step="0.05" value="1.35" />
@@ -114,7 +121,7 @@
             <output id="bounce-count-output">1</output>
           </label>
 
-          <div id="bomb-summary" class="bomb-summary">All pods: drill, 3 walls, 1.35 s</div>
+          <div id="bomb-summary" class="bomb-summary">All pods: Drill, Arc, 3 walls, blast 42</div>
         </section>
 
         <div id="touch-controls" class="touch-controls" hidden>
@@ -134,6 +141,6 @@
 
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-    <script src="./src/game.js?v=flow-fix-8"></script>
+    <script src="./src/game.js?v=flow-fix-9"></script>
   </body>
 </html>
