@@ -28,12 +28,14 @@ const DOOR_OUTSIDE_X = -24;
 const DOOR_INSIDE_X = 104;
 const DOOR_Y = 280;
 const AISLE_X = 236;
+const DEFAULT_LANGUAGE = "vi";
 
 const CUSTOMER_TYPES = [
   {
     id: "man",
     assetId: "customer_man",
     label: "Man",
+    labelVi: "Khách nam",
     skin: "#e8bc9a",
     hair: "#2d211a",
     top: "#6285d8",
@@ -41,11 +43,16 @@ const CUSTOMER_TYPES = [
     accent: "#cfddd4",
     hairStyle: "short",
     silhouette: "broad",
+    speechTemplates: [
+      "Cho mình một ly {drink} nha.",
+      "Cho mình xin một ly {drink} nhé.",
+    ],
   },
   {
     id: "woman",
     assetId: "customer_woman",
     label: "Woman",
+    labelVi: "Khách nữ",
     skin: "#efc6a8",
     hair: "#523124",
     top: "#d86f7a",
@@ -53,11 +60,16 @@ const CUSTOMER_TYPES = [
     accent: "#f4d8cc",
     hairStyle: "long",
     silhouette: "soft",
+    speechTemplates: [
+      "Cho mình một ly {drink} nhé.",
+      "Cho mình xin một ly {drink} nha.",
+    ],
   },
   {
     id: "old_man",
     assetId: "customer_old_man",
     label: "Old man",
+    labelVi: "Chú khách",
     skin: "#e5b89a",
     hair: "#d8d1cb",
     top: "#7da1b8",
@@ -65,11 +77,16 @@ const CUSTOMER_TYPES = [
     accent: "#eadcae",
     hairStyle: "thin",
     silhouette: "narrow",
+    speechTemplates: [
+      "Cho chú một ly {drink} nhé.",
+      "Cho chú xin một ly {drink} nha.",
+    ],
   },
   {
     id: "old_woman",
     assetId: "customer_old_woman",
     label: "Old woman",
+    labelVi: "Cô khách",
     skin: "#ebbf9f",
     hair: "#cfd0d5",
     top: "#6fa89f",
@@ -77,11 +94,16 @@ const CUSTOMER_TYPES = [
     accent: "#f2dbbd",
     hairStyle: "bun",
     silhouette: "soft",
+    speechTemplates: [
+      "Cho cô một ly {drink} nhé.",
+      "Cho cô xin một ly {drink} nha.",
+    ],
   },
   {
     id: "young_boy",
     assetId: "customer_young_boy",
     label: "Young boy",
+    labelVi: "Bé trai",
     skin: "#f0c69c",
     hair: "#3f2617",
     top: "#6da65f",
@@ -89,11 +111,16 @@ const CUSTOMER_TYPES = [
     accent: "#f4d66c",
     hairStyle: "cap",
     silhouette: "compact",
+    speechTemplates: [
+      "Cho cháu xin một ly {drink} ạ.",
+      "Cho cháu một ly {drink} nhé.",
+    ],
   },
   {
     id: "young_girl",
     assetId: "customer_young_girl",
     label: "Young girl",
+    labelVi: "Bé gái",
     skin: "#f2cba9",
     hair: "#452819",
     top: "#f0c15f",
@@ -101,6 +128,10 @@ const CUSTOMER_TYPES = [
     accent: "#8fc8d2",
     hairStyle: "puff",
     silhouette: "compact",
+    speechTemplates: [
+      "Cho cháu xin một ly {drink} ạ.",
+      "Cho cháu một ly {drink} nha.",
+    ],
   },
 ];
 
@@ -109,6 +140,9 @@ const DRINK_TYPES = [
     id: "thai_tea",
     label: "Thai Tea",
     shortLabel: "Thai",
+    labelVi: "trà Thái",
+    shortLabelVi: "Thái",
+    orderLabelVi: "trà Thái",
     liquid: "#d67e3d",
     cup: "#ffe1af",
     straw: "#f45a52",
@@ -118,6 +152,9 @@ const DRINK_TYPES = [
     id: "lemon_tea",
     label: "Lemon Tea",
     shortLabel: "Lemon",
+    labelVi: "trà chanh",
+    shortLabelVi: "Chanh",
+    orderLabelVi: "trà chanh",
     liquid: "#caa642",
     cup: "#f5edd0",
     straw: "#4fa06e",
@@ -127,6 +164,9 @@ const DRINK_TYPES = [
     id: "peach_fizz",
     label: "Peach Fizz",
     shortLabel: "Peach",
+    labelVi: "trà đào",
+    shortLabelVi: "Đào",
+    orderLabelVi: "trà đào",
     liquid: "#ef9a7b",
     cup: "#ffe8df",
     straw: "#5db7d0",
@@ -136,6 +176,9 @@ const DRINK_TYPES = [
     id: "matcha_latte",
     label: "Matcha Latte",
     shortLabel: "Matcha",
+    labelVi: "matcha sữa",
+    shortLabelVi: "Matcha",
+    orderLabelVi: "matcha sữa",
     liquid: "#84b06a",
     cup: "#edf5e0",
     straw: "#e5c657",
@@ -145,6 +188,9 @@ const DRINK_TYPES = [
     id: "berry_soda",
     label: "Berry Soda",
     shortLabel: "Berry",
+    labelVi: "soda dâu",
+    shortLabelVi: "Dâu",
+    orderLabelVi: "soda dâu",
     liquid: "#9a64c0",
     cup: "#f1e7ff",
     straw: "#efb0d2",
@@ -154,6 +200,9 @@ const DRINK_TYPES = [
     id: "milk_tea",
     label: "Milk Tea",
     shortLabel: "Milk",
+    labelVi: "trà sữa",
+    shortLabelVi: "Sữa",
+    orderLabelVi: "trà sữa",
     liquid: "#a66c46",
     cup: "#f1d8b7",
     straw: "#dd634f",
@@ -163,6 +212,8 @@ const DRINK_TYPES = [
 
 const CUSTOMER_TYPE_BY_ID = new Map(CUSTOMER_TYPES.map((entry) => [entry.id, entry]));
 const DRINK_TYPE_BY_ID = new Map(DRINK_TYPES.map((entry) => [entry.id, entry]));
+
+document.documentElement.lang = DEFAULT_LANGUAGE;
 
 const ASSET_PATHS = {
   bg_room: "./public/assets/placeholder/bg-room.svg",
@@ -228,7 +279,7 @@ let gameState = createDefaultState();
 
 init().catch((error) => {
   console.error(error);
-  showToast("Prototype boot failed. Refresh to try again.");
+  showToast("Mở game chưa xong, tải lại giúp mình nhé.");
 });
 
 async function init() {
@@ -271,7 +322,7 @@ function bindEvents() {
   window.addEventListener("appinstalled", () => {
     runtime.installPrompt = null;
     ui.installButton.classList.add("hidden");
-    showToast("Installed. You can reopen it like an app now.");
+    showToast("Cài xong rồi, giờ có thể mở như ứng dụng.");
   });
 }
 
@@ -429,6 +480,7 @@ function normalizeCustomer(customer) {
 
   const tableLayout = getTableLayout(customer.tableId);
   const customerType = getCustomerType(customer.type);
+  const normalizedDrinkId = getDrinkType(customer.drinkId)?.id ?? pickDrinkId();
 
   if (!customerType || !tableLayout) {
     return null;
@@ -448,7 +500,8 @@ function normalizeCustomer(customer) {
     waitElapsed: asNumber(customer.waitElapsed, 0),
     serveElapsed: asNumber(customer.serveElapsed, 0),
     enjoyElapsed: asNumber(customer.enjoyElapsed, 0),
-    drinkId: getDrinkType(customer.drinkId)?.id ?? pickDrinkId(),
+    drinkId: normalizedDrinkId,
+    orderText: normalizeOrderText(customer.orderText, customerType.id, normalizedDrinkId),
     rewardGranted: Boolean(customer.rewardGranted),
     tipReward: asNumber(customer.tipReward, 0),
   };
@@ -644,7 +697,7 @@ function updateWeather(deltaSeconds) {
     if (gameState.weatherRemaining <= 0) {
       gameState.weatherState = "clear";
       gameState.nextWeatherRollIn = randomInRange(...WEATHER_WINDOW);
-      showToast("Rain cleared. The street is busy again.");
+      showToast("Hết mưa rồi, khách lại đông hơn.");
     }
     return;
   }
@@ -655,7 +708,7 @@ function updateWeather(deltaSeconds) {
     gameState.weatherRemaining = RAIN_DURATION;
     gameState.nextWeatherRollIn = randomInRange(...WEATHER_WINDOW);
     runtime.audio.beep("rain");
-    showToast(gameState.umbrellaOwned ? "Light rain. Umbrella is helping." : "Rain cut the foot traffic.");
+    showToast(gameState.umbrellaOwned ? "Mưa nhẹ thôi, ô che vẫn ổn." : "Mưa làm khách thưa đi một chút.");
   }
 }
 
@@ -669,7 +722,7 @@ function updateWind(deltaSeconds) {
   if (gameState.windRemaining > 0) {
     gameState.windRemaining = Math.max(0, gameState.windRemaining - deltaSeconds);
     if (gameState.windRemaining <= 0) {
-      showToast("The strong wind settled down.");
+      showToast("Gió lớn qua rồi.");
     }
     return;
   }
@@ -685,7 +738,7 @@ function startWindEvent() {
   gameState.nextWindRollIn = randomInRange(...WIND_WINDOW);
   gameState.stats.windEvents += 1;
   runtime.audio.beep("rain");
-  showToast("Strong wind is sweeping past the stall.");
+  showToast("Có đợt gió lớn vừa quét ngang quán.");
 }
 
 function updateWandererTimers(deltaSeconds) {
@@ -738,10 +791,10 @@ function spawnWanderer(kind) {
 
   if (kind === "dog") {
     gameState.stats.dogVisits += 1;
-    showToast("A dog is wandering past the shop.");
+    showToast("Có chú chó đi ngang qua quán.");
   } else {
     gameState.stats.catVisits += 1;
-    showToast("A cat slipped into the patio lane.");
+    showToast("Có mèo lững thững ngang quán.");
   }
 }
 
@@ -819,12 +872,12 @@ function updateCustomers(deltaSeconds) {
         gameState.totalMissed += 1;
         gameState.score = Math.max(0, gameState.score - 1);
         spawnFloatingText({
-          text: "Too late",
+          text: "Trễ rồi",
           x: tableLayout.seatX,
           y: tableLayout.y - 10,
           color: "#ffd5d5",
         });
-        showToast(`${customerLabel(customer.type)} left after waiting too long.`);
+        showToast(`${customerLabel(customer.type)} chờ lâu quá nên đi mất rồi.`);
       }
       continue;
     }
@@ -949,6 +1002,7 @@ function spawnCustomer() {
     rewardGranted: false,
     tipReward: 0,
   };
+  customer.orderText = buildCustomerOrderText(customer.type, customer.drinkId);
 
   const table = getTableState(freeTable.id);
   table.status = "reserved";
@@ -999,7 +1053,7 @@ function finishService(customer, table) {
 
   if (tableLayout) {
     spawnFloatingText({
-      text: tipGain > 0 ? `+${1 + tipGain} coins / +${1 + scoreGain} pts` : `+1 coin / +${1 + scoreGain} pts`,
+      text: tipGain > 0 ? `+${1 + tipGain} xu / +${1 + scoreGain} điểm` : `+1 xu / +${1 + scoreGain} điểm`,
       x: tableLayout.seatX,
       y: tableLayout.y - 14,
       color: tipGain > 0 ? "#fff2a8" : "#dcffe1",
@@ -1008,8 +1062,8 @@ function finishService(customer, table) {
 
   const toastMessage =
     tipGain > 0
-      ? `${customerLabel(customer.type)} loved the ${drink?.label ?? "drink"} and tipped you.`
-      : `${customerLabel(customer.type)} got their ${drink?.label ?? "drink"}.`;
+      ? `${customerLabel(customer.type)} rất ưng ly ${drinkLabel(drink)} nên boa thêm.`
+      : `${customerLabel(customer.type)} đã nhận ly ${drinkLabel(drink)}.`;
   showToast(toastMessage);
 }
 
@@ -1041,7 +1095,7 @@ function handleCanvasPointer(event) {
 
   const table = getTableState(tableLayout.id);
   if (!table || table.status !== "waiting") {
-    showToast("That table is not ready to serve.");
+    showToast("Bàn này chưa sẵn để phục vụ.");
     return;
   }
 
@@ -1055,7 +1109,7 @@ function handleCanvasPointer(event) {
   table.status = "serving";
   table.serviceElapsed = 0;
   runtime.audio.beep("tap");
-  showToast(`Pouring ${getDrinkType(customer.drinkId)?.label ?? "iced tea"} now.`);
+  showToast(`Đang pha ${drinkLabel(getDrinkType(customer.drinkId))}.`);
 }
 
 function getCanvasPoint(event) {
@@ -1111,19 +1165,19 @@ function buyUpgrade(kind) {
 
   if (kind === "faster_serve") {
     if (gameState.serveLevel > 0) {
-      showToast("Faster Serve is already active.");
+      showToast("Đã mua Pha nhanh rồi.");
       return;
     }
 
     if (gameState.coins < 10) {
-      showToast("Need 10 coins for Faster Serve.");
+      showToast("Cần 10 xu để mua Pha nhanh.");
       return;
     }
 
     gameState.coins -= 10;
     gameState.serveLevel = 1;
     runtime.audio.beep("upgrade");
-    showToast("Faster Serve unlocked.");
+    showToast("Đã mở Pha nhanh.");
     void persistGameState("upgrade");
     updateHud();
     return;
@@ -1131,19 +1185,19 @@ function buyUpgrade(kind) {
 
   if (kind === "umbrella") {
     if (gameState.umbrellaOwned) {
-      showToast("Umbrella is already covering the stall.");
+      showToast("Quán đã có ô che rồi.");
       return;
     }
 
     if (gameState.coins < 20) {
-      showToast("Need 20 coins for the umbrella.");
+      showToast("Cần 20 xu để mua ô che.");
       return;
     }
 
     gameState.coins -= 20;
     gameState.umbrellaOwned = true;
     runtime.audio.beep("upgrade");
-    showToast("Umbrella unlocked. Rain hurts less now.");
+    showToast("Ô che đã sẵn sàng. Mưa sẽ đỡ ảnh hưởng hơn.");
     void persistGameState("upgrade");
     updateHud();
   }
@@ -1158,11 +1212,11 @@ function togglePause() {
     runtime.mode = "playing";
     runtime.lastFrame = 0;
     ui.titleOverlay.classList.add("hidden");
-    showToast("Back to service.");
+    showToast("Bán tiếp thôi.");
   } else {
     runtime.mode = "paused";
     updateOverlay();
-    showToast("Stall paused.");
+    showToast("Tạm nghỉ một chút.");
   }
 
   updateOverlay();
@@ -1170,7 +1224,7 @@ function togglePause() {
 }
 
 async function resetSave() {
-  const confirmed = window.confirm("Reset the local save for this tea stall?");
+  const confirmed = window.confirm("Xóa dữ liệu lưu cục bộ của quán này nhé?");
   if (!confirmed) {
     return;
   }
@@ -1183,7 +1237,7 @@ async function resetSave() {
   updateOverlay();
   updateHud();
   await persistGameState("reset");
-  showToast("Save reset. Your stall is fresh again.");
+  showToast("Đã xóa dữ liệu. Quán quay về từ đầu rồi.");
 }
 
 async function handleVisibilityChange() {
@@ -1233,7 +1287,7 @@ function applyResumeSimulation(elapsedSeconds) {
     if (estimatedCoins > 0) {
       gameState.coins += estimatedCoins;
       gameState.score += estimatedCoins;
-      showToast(`Idle catch-up: +${estimatedCoins} coins.`);
+      showToast(`Cộng dồn lúc vắng: +${estimatedCoins} xu.`);
     }
   }
 
@@ -1324,11 +1378,11 @@ function drawRoom() {
   ctx.fill();
   ctx.fillStyle = "#734125";
   ctx.font = '700 15px "Trebuchet MS", sans-serif';
-  ctx.fillText("MENU", 184, 121);
+  ctx.fillText("THỰC ĐƠN", 162, 121);
   ctx.fillStyle = "#5e341e";
   ctx.font = '600 12px "Trebuchet MS", sans-serif';
-  ctx.fillText("Tea  Lemon  Matcha", 132, 143);
-  ctx.fillText("Berry  Peach  Milk", 134, 160);
+  ctx.fillText("Thái  Chanh  Matcha", 124, 143);
+  ctx.fillText("Dâu  Đào  Sữa", 138, 160);
 
   ctx.fillStyle = "#d46f45";
   roundedRectPath(ctx, 88, 54, 226, 28, 10);
@@ -1340,9 +1394,9 @@ function drawRoom() {
 
   ctx.fillStyle = "#f3dfb4";
   ctx.font = '700 24px "Trebuchet MS", sans-serif';
-  ctx.fillText("Tea Counter", 116, 210);
+  ctx.fillText("Quầy trà", 134, 210);
   ctx.font = '700 20px "Trebuchet MS", sans-serif';
-  ctx.fillText("Door", 26, 322);
+  ctx.fillText("Cửa vào", 18, 322);
 
   drawStringLights();
   drawCounterDisplay();
@@ -1450,7 +1504,7 @@ function drawTableTimer(layout, table) {
     ctx.fillStyle = "#2a683d";
     ctx.fillRect(timerX - 30, timerY - 24, 60, 28);
     ctx.fillStyle = "#fff7ea";
-    ctx.fillText("OK", timerX, timerY - 2);
+    ctx.fillText("Xong", timerX, timerY - 2);
   }
 
   ctx.restore();
@@ -1487,7 +1541,7 @@ function drawServeHint(layout, table) {
     ctx.fillStyle = "#60351d";
     ctx.font = '700 11px "Trebuchet MS", sans-serif';
     ctx.textAlign = "center";
-    ctx.fillText(drink.shortLabel, centerX, centerY + 34);
+    ctx.fillText(drinkShortLabel(drink), centerX, centerY + 34);
   }
   ctx.restore();
 }
@@ -1611,9 +1665,9 @@ function drawPauseHint() {
   ctx.fillStyle = "#fff7ea";
   ctx.textAlign = "center";
   ctx.font = '700 36px "Trebuchet MS", sans-serif';
-  ctx.fillText("Paused", BOARD_WIDTH / 2, BOARD_HEIGHT / 2);
+  ctx.fillText("Tạm dừng", BOARD_WIDTH / 2, BOARD_HEIGHT / 2);
   ctx.font = '600 18px "Trebuchet MS", sans-serif';
-  ctx.fillText("Tap Resume to reopen the stall.", BOARD_WIDTH / 2, BOARD_HEIGHT / 2 + 32);
+  ctx.fillText("Nhấn Bán tiếp để mở quán lại.", BOARD_WIDTH / 2, BOARD_HEIGHT / 2 + 32);
   ctx.restore();
 }
 
@@ -1632,29 +1686,29 @@ function updateHud() {
   ui.tipsValue.textContent = String(gameState.tipCoins);
   ui.weatherValue.textContent =
     gameState.weatherState === "rain"
-      ? `rain ${Math.ceil(gameState.weatherRemaining)}s`
-      : "clear";
+      ? `mưa ${Math.ceil(gameState.weatherRemaining)}s`
+      : "nắng ráo";
   ui.tablesValue.textContent = `${busyTables} / ${TABLE_LAYOUT.length}`;
-  ui.flowValue.textContent = `${gameState.totalServed} served / ${gameState.totalMissed} missed`;
+  ui.flowValue.textContent = `${gameState.totalServed} phục vụ / ${gameState.totalMissed} lỡ`;
   ui.incidentValue.textContent = currentIncidentLabel();
-  ui.saveValue.textContent = runtime.saveStatus;
+  ui.saveValue.textContent = formatSaveStatus(runtime.saveStatus);
   ui.sessionValue.textContent = formatElapsed(Date.now() - runtime.sessionStartedAt);
   ui.pauseButton.innerHTML =
     runtime.mode === "paused"
-      ? 'Resume<small>back to service</small>'
-      : 'Pause<small>freeze the stall</small>';
+      ? 'Bán tiếp<small>quay lại phục vụ</small>'
+      : 'Tạm dừng<small>ngưng phục vụ</small>';
 
   ui.upgradeServe.disabled = gameState.serveLevel > 0 || gameState.coins < 10;
   ui.upgradeServe.innerHTML =
     gameState.serveLevel > 0
-      ? 'Faster Serve<small>bought</small>'
-      : 'Faster Serve<small>10 coins</small>';
+      ? 'Pha nhanh<small>đã mua</small>'
+      : 'Pha nhanh<small>10 xu</small>';
 
   ui.upgradeUmbrella.disabled = gameState.umbrellaOwned || gameState.coins < 20;
   ui.upgradeUmbrella.innerHTML =
     gameState.umbrellaOwned
-      ? 'Umbrella<small>bought</small>'
-      : 'Umbrella<small>20 coins</small>';
+      ? 'Ô che<small>đã mua</small>'
+      : 'Ô che<small>20 xu</small>';
 
   updateOverlay();
 }
@@ -1663,17 +1717,17 @@ function updateOverlay() {
   if (runtime.mode === "title") {
     ui.titleOverlay.classList.remove("hidden");
     ui.startButton.textContent =
-      gameState.totalServed > 0 || gameState.coins > 0 ? "Continue Stall" : "Open Stall";
+      gameState.totalServed > 0 || gameState.coins > 0 ? "Tiếp tục bán" : "Mở quán";
     ui.overlayCopy.textContent =
-      "Tap tables before the wait timer runs out. Orders now vary by drink, and the street can shift with rain, wind, cats, and dogs.";
+      "Chạm vào bàn trước khi hết giờ chờ. Khách sẽ gọi món bằng tiếng Việt, còn ngoài đường có thể đổi sang mưa, gió lớn, chó và mèo đi ngang.";
     return;
   }
 
   if (runtime.mode === "paused") {
     ui.titleOverlay.classList.remove("hidden");
-    ui.startButton.textContent = "Resume Shift";
+    ui.startButton.textContent = "Tiếp tục ca";
     ui.overlayCopy.textContent =
-      "Service is paused. Resume when you want customers moving again.";
+      "Quán đang tạm dừng. Khi sẵn sàng thì mở lại để khách tiếp tục vào bàn.";
     return;
   }
 
@@ -1772,6 +1826,34 @@ function pickDrinkId() {
   return DRINK_TYPES[Math.floor(Math.random() * DRINK_TYPES.length)].id;
 }
 
+function drinkLabel(drink) {
+  return drink?.labelVi ?? drink?.label ?? "trà";
+}
+
+function drinkShortLabel(drink) {
+  return drink?.shortLabelVi ?? drink?.shortLabel ?? "Trà";
+}
+
+function drinkOrderLabel(drink) {
+  return drink?.orderLabelVi ?? drinkLabel(drink);
+}
+
+function buildCustomerOrderText(typeId, drinkId) {
+  const customerType = getCustomerType(typeId);
+  const drink = getDrinkType(drinkId);
+  const templates = Array.isArray(customerType?.speechTemplates) && customerType.speechTemplates.length > 0
+    ? customerType.speechTemplates
+    : ["Cho mình một ly {drink} nhé."];
+  const template = templates[Math.floor(Math.random() * templates.length)];
+  return template.replace("{drink}", drinkOrderLabel(drink));
+}
+
+function normalizeOrderText(orderText, typeId, drinkId) {
+  return typeof orderText === "string" && orderText.trim().length > 0
+    ? orderText.trim()
+    : buildCustomerOrderText(typeId, drinkId);
+}
+
 function currentWalkSpeedMultiplier() {
   return gameState.windRemaining > 0 ? 0.82 : 1;
 }
@@ -1822,22 +1904,91 @@ function asNumber(value, fallback) {
 }
 
 function customerLabel(type) {
-  return getCustomerType(type)?.label ?? "Customer";
+  return getCustomerType(type)?.labelVi ?? "Khách";
+}
+
+function formatSaveStatus(status) {
+  switch (status) {
+    case "booting":
+      return "đang mở";
+    case "ready":
+      return "sẵn sàng";
+    case "loaded":
+      return "đã tải";
+    case "recovered":
+      return "đã khôi phục";
+    case "saved":
+      return "đã lưu";
+    case "fallback":
+      return "lưu dự phòng";
+    case "save error":
+      return "lỗi lưu";
+    case "start":
+      return "bắt đầu";
+    case "upgrade":
+      return "nâng cấp";
+    case "hidden":
+      return "ẩn nền";
+    case "resume":
+      return "trở lại";
+    case "pagehide":
+      return "rời trang";
+    case "reset":
+      return "đã xóa";
+    default:
+      return status;
+  }
+}
+
+function splitOrderText(orderText, maxChars = 18) {
+  if (typeof orderText !== "string" || orderText.trim().length === 0) {
+    return [];
+  }
+
+  const words = orderText.trim().split(/\s+/);
+  const lines = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+    if (candidate.length <= maxChars || currentLine.length === 0) {
+      currentLine = candidate;
+      continue;
+    }
+
+    lines.push(currentLine);
+    currentLine = word;
+    if (lines.length === 1) {
+      continue;
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  if (lines.length <= 2) {
+    return lines;
+  }
+
+  const firstLine = lines[0];
+  const remainder = lines.slice(1).join(" ");
+  return [firstLine, remainder];
 }
 
 function currentIncidentLabel() {
   const pieces = [];
   if (gameState.windRemaining > 0) {
-    pieces.push("wind");
+    pieces.push("gió lớn");
   }
   if (hasWanderer("dog")) {
-    pieces.push("dog");
+    pieces.push("chó");
   }
   if (hasWanderer("cat")) {
-    pieces.push("cat");
+    pieces.push("mèo");
   }
 
-  return pieces.length > 0 ? pieces.join(" / ") : "quiet street";
+  return pieces.length > 0 ? pieces.join(" / ") : "yên ắng";
 }
 
 function parseSaveSource(primaryRaw, backupRaw) {
@@ -1987,7 +2138,7 @@ function drawCounterDisplay() {
   ctx.fillStyle = "#6c3e23";
   ctx.font = '700 10px "Trebuchet MS", sans-serif';
   ctx.textAlign = "center";
-  ctx.fillText("best sellers", 197, 255);
+  ctx.fillText("bán chạy", 197, 255);
   ctx.restore();
 }
 
@@ -2024,7 +2175,7 @@ function drawTableDrinkMarker(layout, customer) {
   ctx.fillStyle = "#61361d";
   ctx.textAlign = "center";
   ctx.font = '700 10px "Trebuchet MS", sans-serif';
-  ctx.fillText(drink.shortLabel, layout.x + layout.width - 32, layout.y + 20);
+  ctx.fillText(drinkShortLabel(drink), layout.x + layout.width - 32, layout.y + 20);
 
   if (customer.phase === "being_served" || customer.phase === "enjoying") {
     drawDrinkGlass(drink, layout.x + layout.width - 28, layout.y + 56, 0.72);
@@ -2119,7 +2270,8 @@ function drawCustomerStageDecor(customer, drink, timestamp, baseY) {
       customer.x + 2,
       baseY - 82,
       drink,
-      customer.phase === "being_served" ? "Pouring" : customerLabel(customer.type),
+      customer.orderText,
+      customer.phase === "being_served" ? "Đang pha" : "Gọi món",
     );
   }
 
@@ -2131,25 +2283,34 @@ function drawCustomerStageDecor(customer, drink, timestamp, baseY) {
   }
 }
 
-function drawOrderBubble(x, y, drink, caption) {
+function drawOrderBubble(x, y, drink, orderText, statusText) {
+  const orderLines = splitOrderText(orderText);
   ctx.save();
   ctx.fillStyle = "rgba(255, 248, 230, 0.96)";
-  roundedRectPath(ctx, x - 36, y - 18, 72, 36, 14);
+  roundedRectPath(ctx, x - 62, y - 22, 124, 46, 16);
   ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(x - 8, y + 18);
-  ctx.lineTo(x, y + 26);
-  ctx.lineTo(x + 8, y + 18);
+  ctx.moveTo(x - 10, y + 24);
+  ctx.lineTo(x, y + 34);
+  ctx.lineTo(x + 10, y + 24);
   ctx.closePath();
   ctx.fill();
-  drawDrinkGlass(drink, x - 16, y + 8, 0.56);
+  drawDrinkGlass(drink, x - 44, y + 14, 0.56);
   ctx.fillStyle = "#5f351c";
-  ctx.font = '700 11px "Trebuchet MS", sans-serif';
+  ctx.font = '700 10px "Trebuchet MS", sans-serif';
   ctx.textAlign = "left";
-  ctx.fillText(drink.shortLabel, x - 2, y - 1);
-  ctx.font = '600 9px "Trebuchet MS", sans-serif';
+  ctx.fillText(drinkShortLabel(drink), x - 28, y - 7);
+  ctx.font = '600 8px "Trebuchet MS", sans-serif';
   ctx.fillStyle = "#8d6040";
-  ctx.fillText(caption, x - 2, y + 11);
+  ctx.fillText(statusText, x + 18, y - 7);
+  ctx.font = '600 8.5px "Trebuchet MS", sans-serif';
+  ctx.fillStyle = "#5f351c";
+  if (orderLines[0]) {
+    ctx.fillText(orderLines[0], x - 28, y + 6);
+  }
+  if (orderLines[1]) {
+    ctx.fillText(orderLines[1], x - 28, y + 17);
+  }
   ctx.restore();
 }
 

@@ -102,6 +102,11 @@ async function runSmoke(serverUrl) {
     await page.waitForSelector("#title-overlay", { state: "visible" });
     await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
 
+    const documentLanguage = await page.evaluate(() => document.documentElement.lang);
+    if (documentLanguage !== "vi") {
+      throw new Error(`Expected default document language to be vi, got ${documentLanguage}.`);
+    }
+
     const initial = await page.evaluate(() => window.__planBGame.getSnapshot());
     if (!Array.isArray(initial.drinkMenu) || initial.drinkMenu.length < 6) {
       throw new Error("Drink menu did not expose the expected variety.");
@@ -126,6 +131,9 @@ async function runSmoke(serverUrl) {
     });
     if (!waitingCustomer?.drinkId) {
       throw new Error("Waiting customer is missing a drink order.");
+    }
+    if (!waitingCustomer?.orderText) {
+      throw new Error("Waiting customer is missing Vietnamese order text.");
     }
 
     const waitingTable = await page.evaluate(() => {
@@ -182,11 +190,13 @@ async function runSmoke(serverUrl) {
       totalServed: finalState.totalServed,
       coins: finalState.coins,
       score: finalState.score,
+      language: documentLanguage,
       weather: finalState.weatherState,
       incidentLabel: finalState.incidentLabel,
       drinkMenuSize: finalState.drinkMenu.length,
       wanderers: finalState.wanderers.map((wanderer) => wanderer.kind).sort(),
       firstOrder: waitingCustomer.drinkId,
+      firstOrderText: waitingCustomer.orderText,
       missingAssetStatus: missingAssetSummary.status,
       missingAssetContentType: missingAssetSummary.contentType,
       missingAssetCached: cacheSummary.cachedAfterFetch,
