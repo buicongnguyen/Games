@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sky Drill 2</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="stage" aria-label="Sky Drill 2 game">
+        <div id="game-root" class="game-root"></div>
+
+        <header class="hud hud-top" aria-label="Game status">
+          <div class="brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span class="brand-name">Sky Drill 2</span>
+            <span id="chapter-chip" class="chapter-chip"></span>
+          </div>
+          <div id="hud-stats" class="stats" aria-live="off"></div>
+          <div class="hud-actions">
+            <button id="pause-button" class="icon-button" type="button" title="Pause (ESC)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="icon-pause"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor" class="icon-play"><path d="M7 4.5v15l13-7.5z"/></svg>
+              <span class="sr-only">Pause</span>
+            </button>
+            <button id="mute-button" class="icon-button" type="button" title="Mute (M)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-sound"><path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-muted"><path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor" stroke="none"/><line x1="15" y1="9" x2="21" y2="15"/><line x1="21" y1="9" x2="15" y2="15"/></svg>
+              <span class="sr-only">Mute</span>
+            </button>
+            <button id="menu-button" class="icon-button" type="button" title="Level menu" aria-expanded="false" aria-controls="menu-panel">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+              <span class="sr-only">Level menu</span>
+            </button>
+          </div>
+          <div id="menu-panel" class="menu-panel" hidden>
+            <button id="redo-button" class="menu-item" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+              <span>Restart level (R)</span>
+            </button>
+            <button id="skip-button" class="menu-item" type="button">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4.5v15l10-7.5z"/><rect x="17" y="4.5" width="2.6" height="15" rx="1"/></svg>
+              <span>Skip level (N)</span>
+            </button>
+            <button id="quit-button" class="menu-item" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+              <span>Quit to title</span>
+            </button>
+          </div>
+        </header>
+
+        <section id="drop-controls" class="hud controls" aria-label="Drop controls" hidden>
+          <label class="control">
+            <span>Angle</span>
+            <input id="angle-input" type="range" min="-55" max="55" step="1" value="12" />
+            <output id="angle-output">12°</output>
+          </label>
+          <label class="control">
+            <span>Launch speed</span>
+            <input id="speed-input" type="range" min="160" max="520" step="10" value="330" />
+            <output id="speed-output">330</output>
+          </label>
+          <label class="control">
+            <span>Drop delay</span>
+            <input id="delay-input" type="range" min="0" max="1.8" step="0.05" value="0.45" />
+            <output id="delay-output">0.45 s</output>
+          </label>
+          <button id="drop-button" class="primary" type="button" title="Drop pod (SPACE)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14"/><path d="m6 11 6 6 6-6"/><path d="M5 21h14"/></svg>
+            <span>Drop</span>
+          </button>
+          <button id="bomb-config-button" class="tool-button" type="button" title="Bomb setup">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2.4" fill="currentColor" stroke="none"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2.4" fill="currentColor" stroke="none"/></svg>
+            <span class="button-label">Bomb</span>
+          </button>
+        </section>
+
+        <section id="bomb-panel" class="hud bomb-panel" aria-label="Bomb setup" hidden>
+          <header class="panel-head">
+            <strong>Bomb setup</strong>
+            <button id="bomb-close-button" class="icon-button" type="button" title="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+              <span class="sr-only">Close</span>
+            </button>
+          </header>
+
+          <div class="segmented" role="group" aria-label="Apply setup to">
+            <button id="scope-all-button" class="segment is-active" type="button" data-scope="all">All pods</button>
+            <button id="scope-next-button" class="segment" type="button" data-scope="next">Next pod</button>
+          </div>
+
+          <div class="segmented seg-3" role="group" aria-label="Bomb type">
+            <button class="segment is-active" type="button" data-bomb-type="drill">Drill</button>
+            <button class="segment" type="button" data-bomb-type="bounce">Bounce</button>
+            <button class="segment" type="button" data-bomb-type="timer">Timer</button>
+          </div>
+
+          <div class="segmented seg-4" role="group" aria-label="Pod trajectory">
+            <button class="segment is-active" type="button" data-bomb-path="arc">Arc</button>
+            <button class="segment" type="button" data-bomb-path="drop">Brake</button>
+            <button class="segment" type="button" data-bomb-path="hook">Hook</button>
+            <button class="segment" type="button" data-bomb-path="zigzag">Zigzag</button>
+          </div>
+
+          <label class="control">
+            <span>Fuse</span>
+            <input id="fuse-input" type="range" min="0.35" max="3" step="0.05" value="1.35" />
+            <output id="fuse-output">1.35 s</output>
+          </label>
+
+          <label class="control">
+            <span>Blast radius</span>
+            <input id="blast-input" type="range" min="24" max="62" step="2" value="42" />
+            <output id="blast-output">42</output>
+          </label>
+
+          <label class="control">
+            <span>Drill depth</span>
+            <input id="drill-walls-input" type="range" min="1" max="7" step="1" value="5" />
+            <output id="drill-walls-output">5</output>
+          </label>
+
+          <label class="control">
+            <span>Bounces</span>
+            <input id="bounce-count-input" type="range" min="1" max="3" step="1" value="1" />
+            <output id="bounce-count-output">1</output>
+          </label>
+
+          <div id="bomb-summary" class="bomb-summary"></div>
+        </section>
+
+        <div id="touch-controls" class="touch-controls" hidden>
+          <div id="move-pad" class="touch-pad move-pad" role="application" aria-label="Move control">
+            <span class="pad-cross" aria-hidden="true"></span>
+            <span id="move-pad-knob" class="pad-knob" aria-hidden="true"></span>
+          </div>
+          <div id="fire-pad" class="touch-pad fire-pad" role="application" aria-label="Fire direction control">
+            <span class="pad-cross" aria-hidden="true"></span>
+            <span id="fire-pad-knob" class="pad-knob" aria-hidden="true"></span>
+          </div>
+        </div>
+
+        <p id="control-hint" class="control-hint" hidden></p>
+        <div id="message" class="message" aria-live="polite"></div>
+        <div id="level-banner" class="level-banner" aria-hidden="true">
+          <strong id="level-banner-title"></strong>
+          <span id="level-banner-sub"></span>
+        </div>
+        <div id="overlay" class="overlay" hidden></div>
+      </section>
+    </main>
+
+    <script src="./vendor/phaser.min.js"></script>
+    <script src="./src/data.js"></script>
+    <script src="./src/core.js"></script>
+    <script src="./src/ui.js"></script>
+    <script src="./src/chapter1.js"></script>
+    <script src="./src/chapter2.js"></script>
+    <script src="./src/chapter3.js"></script>
+    <script src="./src/main.js"></script>
+  </body>
+</html>
