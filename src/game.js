@@ -206,6 +206,8 @@
   const SHIP_CENTER = { x: WORLD.width / 2, y: 316 };
   const SHIP_LIMITS = { left: 214, right: 746, top: 130, bottom: 472 };
   const SHIP_MOVE_SPEED = 224;
+  const SHIP_ACCEL = 820;
+  const SHIP_WATER_DRAG = 3.8;
   const SHIP_FIRE_RATE = 0.22;
   const SHIP_BULLET_SPEED = 980;
   const SHIP_BULLET_LIFE = 2.25;
@@ -234,6 +236,8 @@
   const HELI_BASE = { x: WORLD.width / 2, y: 462 };
   const HELI_LIMITS = { left: 268, right: 692, top: 350, bottom: 500 };
   const HELI_MOVE_SPEED = 236;
+  const HELI_ACCEL = 760;
+  const HELI_AIR_DRAG = 4.2;
   const HELI_FIRE_RATE = 0.18;
   const HELI_HOLE_APPEAR_TIME = 1.15;
   const HELI_HOLE_POSITIONS = [
@@ -276,11 +280,143 @@
     return current + (target - current) * clamp(amount, 0, 1);
   }
 
+  function smoothStep01(value) {
+    const t = clamp(value, 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+
+  function applyQuadraticDrag(body, dt, dragCoefficient, minFactor) {
+    const speed = Math.hypot(body.vx, body.vy);
+    if (speed < 0.001) {
+      return 0;
+    }
+    const factor = Math.max(minFactor == null ? 0.8 : minFactor, 1 - speed * dragCoefficient * dt);
+    body.vx *= factor;
+    body.vy *= factor;
+    return speed;
+  }
+
+  function sampleIslandSurfaceY(x) {
+    const local = clamp((x - MAP.x) / MAP.width, 0, 1);
+    const crest = Math.sin(local * Math.PI) * 9;
+    const dune = Math.sin(local * Math.PI * 2.25 + 0.35) * 4.5 + Math.sin(local * Math.PI * 5.1 - 0.3) * 2.1;
+    const leftRise = smoothStep01(clamp((0.17 - local) / 0.17, 0, 1)) * 18;
+    const rightRise = smoothStep01(clamp((local - 0.83) / 0.17, 0, 1)) * 16;
+    return SURFACE_Y - 8 - crest * 0.58 - dune * 0.72 + leftRise + rightRise;
+  }
+
+  function sampleIslandSurfaceNormal(x) {
+    const epsilon = 4;
+    const y0 = sampleIslandSurfaceY(x - epsilon);
+    const y1 = sampleIslandSurfaceY(x + epsilon);
+    const slope = (y1 - y0) / (epsilon * 2);
+    const length = Math.hypot(slope, -1) || 1;
+    return { x: slope / length, y: -1 / length };
+  }
+
+  function reflectVelocity(vx, vy, normal, restitution, tangentDamping) {
+    const tangent = { x: -normal.y, y: normal.x };
+    const normalSpeed = vx * normal.x + vy * normal.y;
+    const tangentSpeed = vx * tangent.x + vy * tangent.y;
+    const bouncedNormal = normalSpeed < 0 ? -normalSpeed * restitution : normalSpeed;
+    const dampedTangent = tangentSpeed * tangentDamping;
+    return {
+      vx: tangent.x * dampedTangent + normal.x * bouncedNormal,
+      vy: tangent.y * dampedTangent + normal.y * bouncedNormal,
+    };
+  }
+
+  function advanceBodyWithIntent(state, dt, intentX, intentY, accel, drag, maxSpeed, posXKey, posYKey, velXKey, velYKey, bounds) {
+    let ax = intentX;
+    let ay = intentY;
+    const intentLength = Math.hypot(ax, ay);
+    const activeIntent = intentLength > 0.001;
+    if (activeIntent) {
+      ax /= intentLength;
+      ay /= intentLength;
+      state[velXKey] += ax * accel * dt;
+      state[velYKey] += ay * accel * dt;
+    }
+
+    const damping = Math.exp(-drag * dt * (activeIntent ? 0.9 : 1.24));
+    state[velXKey] *= damping;
+    state[velYKey] *= damping;
+
+    const speed = Math.hypot(state[velXKey], state[velYKey]);
+    if (speed > maxSpeed) {
+      const scale = maxSpeed / speed;
+      state[velXKey] *= scale;
+      state[velYKey] *= scale;
+    }
+
+    state[posXKey] += state[velXKey] * dt;
+    state[posYKey] += state[velYKey] * dt;
+
+    if (bounds) {
+      if (state[posXKey] < bounds.minX) {
+        state[posXKey] = bounds.minX;
+        state[velXKey] *= 0.35;
+      } else if (state[posXKey] > bounds.maxX) {
+        state[posXKey] = bounds.maxX;
+        state[velXKey] *= 0.35;
+      }
+      if (state[posYKey] < bounds.minY) {
+        state[posYKey] = bounds.minY;
+        state[velYKey] *= 0.35;
+      } else if (state[posYKey] > bounds.maxY) {
+        state[posYKey] = bounds.maxY;
+        state[velYKey] *= 0.35;
+      }
+    }
+
+    return {
+      speed: Math.hypot(state[velXKey], state[velYKey]),
+      activeIntent,
+      dirX: activeIntent ? ax : 0,
+      dirY: activeIntent ? ay : 0,
+    };
+  }
+
+  function pushTrailPoint(entity, maxPoints, extras) {
+    if (!entity.trail) {
+      entity.trail = [];
+    }
+    entity.trail.push({
+      x: entity.x,
+      y: entity.y,
+      ...(extras || {}),
+    });
+    if (entity.trail.length > maxPoints) {
+      entity.trail.shift();
+    }
+  }
+
+  function drawMotionTrail(graphics, points, color, alphaScale, baseRadius, glowColor) {
+    if (!points || points.length < 2) {
+      return;
+    }
+    const glow = glowColor || blendColor(color, 0xffffff, 0.24);
+    for (let i = 1; i < points.length; i += 1) {
+      const point = points[i];
+      const prev = points[i - 1];
+      const t = i / (points.length - 1);
+      const alpha = (alphaScale || 0.2) * t;
+      const width = Math.max(0.8, (baseRadius || 2) * (0.42 + t * 0.92));
+      graphics.lineStyle(width + 1.2, color, alpha * 0.18);
+      graphics.lineBetween(prev.x, prev.y, point.x, point.y);
+      graphics.lineStyle(width, glow, alpha * 0.9);
+      graphics.lineBetween(prev.x, prev.y, point.x, point.y);
+      graphics.fillStyle(glow, alpha * 0.75);
+      graphics.fillCircle(point.x, point.y, width * 0.72);
+    }
+  }
+
   function createBombMotionState(origin, angleDeg, speed) {
     const radians = Phaser.Math.DegToRad(angleDeg);
     const baseVx = origin.speed + Math.sin(radians) * speed * 0.68;
     const baseVy = Math.cos(radians) * speed;
     const forward = baseVx >= 0 ? 1 : -1;
+    const launchSpeed = Math.hypot(baseVx, baseVy);
     return {
       x: origin.x,
       y: origin.y + 18,
@@ -297,6 +433,9 @@
       pathPhaseTime: 0,
       pathCruiseSpeed: Math.max(Math.abs(baseVx) * 1.08, origin.speed + speed * 0.3),
       pathDiveSpeed: Math.max(210, Math.abs(baseVy) * 0.94 + 34),
+      launchSpeed,
+      speed: launchSpeed,
+      roll: Phaser.Math.FloatBetween(-0.35, 0.35),
     };
   }
 
@@ -307,14 +446,10 @@
     pod.pathPhaseTime += dt;
     if (pod.bounces > 0) {
       pod.vy += GRAVITY * dt;
-      return;
-    }
-    if (path === "drop") {
+    } else if (path === "drop") {
       pod.vx = approachValue(pod.vx, pod.forward * Math.max(18, Math.abs(pod.baseVx) * 0.08), steer * 1.25);
       pod.vy += GRAVITY * dt * 1.22;
-      return;
-    }
-    if (path === "hook") {
+    } else if (path === "hook") {
       if (pod.pathPhase === 0 && (pod.pathAge >= 0.2 || pod.y >= pod.releaseY + 58)) {
         pod.pathPhase = 1;
         pod.pathPhaseTime = 0;
@@ -327,9 +462,7 @@
         pod.vy = approachValue(pod.vy, 14, steer * 1.8);
         pod.vy += 20 * dt;
       }
-      return;
-    }
-    if (path === "zigzag") {
+    } else if (path === "zigzag") {
       if (pod.pathPhase === 0 && (pod.pathAge >= 0.16 || pod.y >= pod.releaseY + 40)) {
         pod.pathPhase = 1;
         pod.pathPhaseTime = 0;
@@ -349,9 +482,13 @@
         pod.vy = approachValue(pod.vy, pod.pathDiveSpeed * 0.9, steer * 1.3);
         pod.vy += 26 * dt;
       }
-      return;
+    } else {
+      pod.vy += GRAVITY * dt;
     }
-    pod.vy += GRAVITY * dt;
+    const dragCoefficient =
+      path === "drop" ? 0.00165 : path === "hook" ? 0.00125 : path === "zigzag" ? 0.00138 : 0.00112;
+    pod.speed = applyQuadraticDrag(pod, dt, dragCoefficient, 0.84);
+    pod.roll = approachValue(pod.roll || 0, clamp(pod.vy / Math.max(120, pod.launchSpeed), -0.9, 0.9) * 0.42, dt * 4.8);
   }
 
   function circleRectIntersects(cx, cy, radius, rect) {
@@ -1142,7 +1279,7 @@
         ...motion,
         radius: level.podRadius,
         drillRadius: level.drillRadius,
-        energy: speed * 0.78,
+        energy: speed * 0.92,
         config: bombConfig,
         fuseLeft: bombConfig.fuse,
         piercedWalls: 0,
@@ -1150,6 +1287,7 @@
         groundCooldown: 0,
         dead: false,
         trail: [],
+        impactGlow: 0,
       };
       this.bombing.podsLeft -= 1;
       this.bombing.pendingDrop = null;
@@ -1173,19 +1311,25 @@
         pod.prevY = pod.y;
         pod.fuseLeft -= dt;
         pod.groundCooldown = Math.max(0, pod.groundCooldown - dt);
+        pod.impactGlow = Math.max(0, (pod.impactGlow || 0) - dt * 2.8);
         advanceBombPathMotion(pod, dt);
         pod.x += pod.vx * dt;
         pod.y += pod.vy * dt;
-        pod.trail.push({ x: pod.x, y: pod.y });
-        if (pod.trail.length > 34) {
-          pod.trail.shift();
-        }
+        pod.speed = Math.hypot(pod.vx, pod.vy);
+        pushTrailPoint(pod, 36, { speed: pod.speed });
 
         const contact = this.sampleDamage(pod, dt);
         if (pod.dead) {
           continue;
         }
-        pod.energy -= contact.touched ? (Number(els.speed.value) * 0.64 + 190) * dt : 22 * dt;
+        if (contact.touched && contact.drag > 0) {
+          const slow = clamp(contact.drag * 0.016, 0, 0.2);
+          pod.vx *= 1 - slow;
+          pod.vy *= 1 - slow * 0.82;
+          pod.speed = Math.hypot(pod.vx, pod.vy);
+        }
+        const aerodynamicLoss = 9 * dt + pod.speed * 0.014 * dt;
+        pod.energy -= aerodynamicLoss + contact.energyLoss;
 
         if (pod.config.type === "drill" && pod.piercedWalls >= pod.config.drillWalls) {
           this.explodePod(pod, "drill");
@@ -1270,35 +1414,42 @@
       const dy = pod.y - pod.prevY;
       const dist = Math.max(1, Math.hypot(dx, dy));
       const steps = Math.ceil(dist / 7);
-      const contact = { touched: false };
+      const contact = { touched: false, drag: 0, energyLoss: 0 };
       for (let i = 0; i <= steps; i += 1) {
         const t = i / steps;
         const x = pod.prevX + dx * t;
         const y = pod.prevY + dy * t;
-        const hit = this.damageAt(x, y, pod.drillRadius, 180 * dt + pod.drillRadius * 0.9, "drill");
+        const stepScale = dist / Math.max(1, steps) / 7;
+        const drillDamage = (6 + pod.speed * 0.014 + pod.drillRadius * 0.42) * stepScale;
+        const hit = this.damageAt(x, y, pod.drillRadius, drillDamage, "drill");
         if (hit.touched) {
           contact.touched = true;
           pod.piercedWalls += hit.destroyed;
+          contact.drag += hit.resistance;
+          contact.energyLoss += hit.resistance * 0.55;
         }
-        if (y > SURFACE_Y + 12 && x > MAP.x && x < MAP.x + MAP.width) {
+        const surfaceY = sampleIslandSurfaceY(x);
+        if (y >= surfaceY + 4 && x > MAP.x && x < MAP.x + MAP.width) {
           contact.touched = true;
-          this.handleLandContact(pod, x, y, dt);
+          contact.energyLoss += this.handleLandContact(pod, x, y, dt, surfaceY);
           if (pod.dead) {
             break;
           }
+          break;
         }
       }
       return contact;
     }
 
     damageAt(x, y, radius, damage, source) {
-      const contact = { touched: false, destroyed: 0 };
+      const contact = { touched: false, destroyed: 0, resistance: 0 };
       for (const building of this.bombing.buildings) {
         for (const block of building.blocks) {
           if (block.destroyed || !circleRectIntersects(x, y, radius, block)) {
             continue;
           }
           contact.touched = true;
+          contact.resistance += block.row === block.rows - 1 ? 1.45 : 1;
           block.health -= damage;
           if (source !== "blast") {
             this.bombing.fx.push({
@@ -1324,13 +1475,15 @@
       return contact;
     }
 
-    handleLandContact(pod, x, y, dt) {
+    handleLandContact(pod, x, y, dt, surfaceY) {
+      const normal = sampleIslandSurfaceNormal(x);
+      const impactSpeed = Math.max(0, -(pod.vx * normal.x + pod.vy * normal.y));
       if (Math.random() < 0.16) {
         this.bombing.fx.push({
           x,
-          y: Math.min(y, SURFACE_Y + 52),
-          vx: Phaser.Math.Between(-28, 28),
-          vy: Phaser.Math.Between(-20, 8),
+          y: Math.min(y, surfaceY + 52),
+          vx: normal.x * Phaser.Math.Between(18, 46) + Phaser.Math.Between(-18, 18),
+          vy: normal.y * Phaser.Math.Between(26, 64) + Phaser.Math.Between(-12, 12),
           life: 0.42,
           maxLife: 0.42,
           size: Phaser.Math.Between(2, 4),
@@ -1340,23 +1493,32 @@
 
       if (pod.config.type === "bounce") {
         if (pod.groundCooldown > 0) {
-          return;
+          return 0;
         }
-        pod.x = x;
-        pod.y = SURFACE_Y - pod.radius - 2;
-        pod.vx *= 0.72;
-        pod.vy = -Math.abs(pod.vy) * (0.34 + pod.bounces * 0.07);
+        const restitution = clamp(0.28 + impactSpeed / 620, 0.24, 0.46);
+        const tangentDamping = clamp(0.82 - pod.bounces * 0.08, 0.54, 0.82);
+        const reflected = reflectVelocity(pod.vx, pod.vy, normal, restitution, tangentDamping);
+        pod.x = x + normal.x * (pod.radius + 2);
+        pod.y = surfaceY + normal.y * (pod.radius + 2);
+        pod.vx = reflected.vx;
+        pod.vy = reflected.vy;
         pod.bounces += 1;
+        pod.impactGlow = 1;
         pod.groundCooldown = 0.18;
         if (pod.bounces >= pod.config.bounceCount) {
           pod.fuseLeft = Math.min(pod.fuseLeft, 0.25);
         }
-        return;
+        return 8 + impactSpeed * 0.05;
       }
+      pod.x = x + normal.x * Math.max(1.2, pod.radius * 0.18);
+      pod.y = surfaceY + normal.y * Math.max(1.2, pod.radius * 0.18);
+      pod.impactGlow = clamp(impactSpeed / 240, 0.28, 1);
+      pod.vx *= pod.config.type === "drill" ? 0.94 : 0.82;
+      pod.vy = Math.max(pod.vy * 0.64, 36);
       if (pod.config.type === "timer") {
         pod.fuseLeft = Math.min(pod.fuseLeft, 0.12);
       }
-      pod.energy -= pod.config.type === "drill" ? 18 * dt : 36 * dt;
+      return pod.config.type === "drill" ? 7 + impactSpeed * 0.028 : 12 + impactSpeed * 0.05;
     }
 
     checkTargetsByDrill(pod) {
@@ -1465,10 +1627,39 @@
       if (this.chapterBackgrounds) {
         this.bg.fillStyle(0x041018, 0.08);
         this.bg.fillRect(0, 0, WORLD.width, WORLD.height);
+        this.bg.fillStyle(0x0f6e90, 0.14);
+        this.bg.fillRoundedRect(MAP.x - 10, MAP.y - 8, MAP.width + 20, MAP.height + 16, 14);
         this.bg.fillStyle(0x365c36, 0.34);
-        this.bg.fillRoundedRect(MAP.x + 86, SURFACE_Y + 8, MAP.width - 172, 58, 10);
+        this.bg.beginPath();
+        this.bg.moveTo(MAP.x, WORLD.height);
+        this.bg.lineTo(MAP.x, sampleIslandSurfaceY(MAP.x));
+        for (let x = MAP.x; x <= MAP.x + MAP.width; x += 12) {
+          this.bg.lineTo(x, sampleIslandSurfaceY(x));
+        }
+        this.bg.lineTo(MAP.x + MAP.width, WORLD.height);
+        this.bg.closePath();
+        this.bg.fillPath();
         this.bg.fillStyle(0x1f3026, 0.24);
-        this.bg.fillRoundedRect(MAP.x + 116, SURFACE_Y + 36, MAP.width - 232, 28, 8);
+        this.bg.beginPath();
+        this.bg.moveTo(MAP.x + 18, WORLD.height);
+        this.bg.lineTo(MAP.x + 18, sampleIslandSurfaceY(MAP.x + 18) + 26);
+        for (let x = MAP.x + 18; x <= MAP.x + MAP.width - 18; x += 16) {
+          this.bg.lineTo(x, sampleIslandSurfaceY(x) + 26 + Math.sin((x - MAP.x) * 0.03) * 2);
+        }
+        this.bg.lineTo(MAP.x + MAP.width - 18, WORLD.height);
+        this.bg.closePath();
+        this.bg.fillPath();
+        this.bg.lineStyle(2.2, 0xc0f2d5, 0.22);
+        this.bg.beginPath();
+        this.bg.moveTo(MAP.x, sampleIslandSurfaceY(MAP.x));
+        for (let x = MAP.x; x <= MAP.x + MAP.width; x += 10) {
+          this.bg.lineTo(x, sampleIslandSurfaceY(x));
+        }
+        this.bg.strokePath();
+        this.bg.lineStyle(1.4, 0x9fe7ff, 0.12);
+        for (let y = MAP.y + 34; y < SURFACE_Y - 34; y += 48) {
+          this.bg.lineBetween(MAP.x + 28, y, MAP.x + MAP.width - 28, y + 8);
+        }
         this.bg.lineStyle(3, 0xf4f7f9, 0.32);
         this.bg.strokeRoundedRect(MAP.x - 22, MAP.y - 18, MAP.width + 44, MAP.height + 40, 12);
         return;
@@ -1485,12 +1676,27 @@
       this.bg.lineStyle(3, 0xf4f7f9, 0.42);
       this.bg.strokeRoundedRect(MAP.x - 22, MAP.y - 18, MAP.width + 44, MAP.height + 40, 12);
       this.bg.fillStyle(palette.island, 1);
-      this.bg.fillRoundedRect(MAP.x, MAP.y, MAP.width, MAP.height, 8);
+      this.bg.beginPath();
+      this.bg.moveTo(MAP.x, WORLD.height);
+      this.bg.lineTo(MAP.x, sampleIslandSurfaceY(MAP.x));
+      for (let x = MAP.x; x <= MAP.x + MAP.width; x += 10) {
+        this.bg.lineTo(x, sampleIslandSurfaceY(x));
+      }
+      this.bg.lineTo(MAP.x + MAP.width, WORLD.height);
+      this.bg.closePath();
+      this.bg.fillPath();
       this.bg.fillStyle(0x7ecb98, 0.72);
       this.bg.fillEllipse(MAP.x + 128, MAP.y + 102, 180, 90);
       this.bg.fillEllipse(MAP.x + 684, MAP.y + 224, 240, 116);
       this.bg.fillStyle(0x358963, 0.58);
       this.bg.fillEllipse(MAP.x + 720, MAP.y + 88, 170, 72);
+      this.bg.lineStyle(2.2, 0xc1f2d4, 0.28);
+      this.bg.beginPath();
+      this.bg.moveTo(MAP.x, sampleIslandSurfaceY(MAP.x));
+      for (let x = MAP.x; x <= MAP.x + MAP.width; x += 10) {
+        this.bg.lineTo(x, sampleIslandSurfaceY(x));
+      }
+      this.bg.strokePath();
       this.bg.lineStyle(10, palette.road, 0.9);
       this.bg.beginPath();
       this.bg.moveTo(MAP.x + 28, SURFACE_Y + 28);
@@ -1514,6 +1720,7 @@
       const preview = {
         ...createBombMotionState({ x: futureX, y: this.plane.y, speed: this.plane.speed }, angleDeg, speed),
         config,
+        radius: this.bombing.level.podRadius,
         bounces: 0,
       };
       let x = futureX;
@@ -1527,6 +1734,21 @@
         preview.y += preview.vy * 0.035;
         x = preview.x;
         y = preview.y;
+        const surfaceY = x > MAP.x && x < MAP.x + MAP.width ? sampleIslandSurfaceY(x) : WORLD.height + 99;
+        if (y >= surfaceY && config.type === "bounce" && preview.bounces < config.bounceCount) {
+          const normal = sampleIslandSurfaceNormal(x);
+          const reflected = reflectVelocity(preview.vx, preview.vy, normal, 0.34, 0.76);
+          preview.vx = reflected.vx;
+          preview.vy = reflected.vy;
+          preview.x = x + normal.x * (preview.radius + 2);
+          preview.y = surfaceY + normal.y * (preview.radius + 2);
+          preview.bounces += 1;
+          x = preview.x;
+          y = preview.y;
+        } else if (y >= surfaceY + 4) {
+          this.trajectory.lineTo(x, surfaceY);
+          break;
+        }
         if (i % 2 === 0) {
           this.trajectory.lineTo(x, y);
         } else {
@@ -1553,12 +1775,25 @@
 
     drawBasements() {
       this.map.fillStyle(0x1d2a2b, 0.78);
-      this.map.fillRoundedRect(MAP.x + 116, SURFACE_Y - 8, 690, 56, 6);
+      this.map.beginPath();
+      this.map.moveTo(MAP.x + 112, WORLD.height);
+      this.map.lineTo(MAP.x + 112, sampleIslandSurfaceY(MAP.x + 112) - 4);
+      for (let x = MAP.x + 112; x <= MAP.x + 806; x += 10) {
+        this.map.lineTo(x, sampleIslandSurfaceY(x) - 4);
+      }
+      this.map.lineTo(MAP.x + 806, WORLD.height);
+      this.map.closePath();
+      this.map.fillPath();
       this.map.lineStyle(2, 0x9bd29e, 0.25);
-      this.map.strokeRoundedRect(MAP.x + 116, SURFACE_Y - 8, 690, 56, 6);
+      this.map.beginPath();
+      this.map.moveTo(MAP.x + 112, sampleIslandSurfaceY(MAP.x + 112) - 4);
+      for (let x = MAP.x + 112; x <= MAP.x + 806; x += 10) {
+        this.map.lineTo(x, sampleIslandSurfaceY(x) - 4);
+      }
+      this.map.strokePath();
       this.map.fillStyle(0x0f171b, 0.4);
       for (let x = MAP.x + 150; x < MAP.x + 770; x += 84) {
-        this.map.fillRect(x, SURFACE_Y - 7, 3, 55);
+        this.map.fillRect(x, sampleIslandSurfaceY(x) - 7, 3, 55);
       }
     }
 
@@ -1623,21 +1858,23 @@
 
     drawPods() {
       for (const pod of this.bombing.activePods) {
-        for (let i = 0; i < pod.trail.length; i += 1) {
-          const point = pod.trail[i];
-          const a = i / pod.trail.length;
-          this.dynamic.fillStyle(palette.pod, 0.06 + a * 0.16);
-          this.dynamic.fillCircle(point.x, point.y, 1.2 + a * pod.radius * 0.54);
-        }
+        drawMotionTrail(this.dynamic, pod.trail, palette.pod, 0.22, pod.radius * 0.22, blendColor(palette.pod, palette.shock, 0.4));
         const rotation = Math.atan2(pod.vy, pod.vx);
         const r = pod.radius;
         this.dynamic.save();
         this.dynamic.translateCanvas(pod.x, pod.y);
-        this.dynamic.rotateCanvas(rotation);
+        this.dynamic.rotateCanvas(rotation + (pod.roll || 0));
+        this.dynamic.fillStyle(palette.pod, 0.14 + (pod.impactGlow || 0) * 0.2);
+        this.dynamic.fillEllipse(-0.4 * r, 0, 4.2 * r, 2 * r);
         this.dynamic.fillStyle(palette.pod, 1);
-        this.dynamic.fillRoundedRect(-1.45 * r, -0.72 * r, 2.9 * r, 1.44 * r, 3);
+        this.dynamic.fillRoundedRect(-1.5 * r, -0.72 * r, 3 * r, 1.44 * r, 3);
+        this.dynamic.fillStyle(0xf6f0d8, 0.82);
+        this.dynamic.fillRoundedRect(-0.95 * r, -0.44 * r, 1.4 * r, 0.48 * r, 2);
         this.dynamic.fillStyle(0x1a2027, 1);
-        this.dynamic.fillTriangle(1.18 * r, -0.88 * r, 2.4 * r, 0, 1.18 * r, 0.88 * r);
+        this.dynamic.fillTriangle(1.12 * r, -0.88 * r, 2.42 * r, 0, 1.12 * r, 0.88 * r);
+        this.dynamic.fillStyle(0x2f3d49, 0.96);
+        this.dynamic.fillTriangle(-0.96 * r, -0.64 * r, -1.52 * r, -1.22 * r, -0.82 * r, -0.12 * r);
+        this.dynamic.fillTriangle(-0.96 * r, 0.64 * r, -1.52 * r, 1.22 * r, -0.82 * r, 0.12 * r);
         this.dynamic.restore();
       }
     }
@@ -1707,6 +1944,10 @@
         scroll: 0,
         shipX: 0,
         shipY: 0,
+        shipVx: 0,
+        shipVy: 0,
+        roll: 0,
+        wakePhase: Math.random() * Math.PI * 2,
         armor: 9,
         shieldHp: [3, 3, 3],
         bullets: [],
@@ -1810,13 +2051,27 @@
       const down = this.cursors.down.isDown || this.keys.S.isDown;
       const moveX = (right ? 1 : 0) - (left ? 1 : 0) + this.movePad.x;
       const moveY = (down ? 1 : 0) - (up ? 1 : 0) + this.movePad.y;
-      if (moveX !== 0 || moveY !== 0) {
-        const length = Math.hypot(moveX, moveY);
-        state.shipX += (moveX / length) * SHIP_MOVE_SPEED * dt;
-        state.shipY += (moveY / length) * SHIP_MOVE_SPEED * dt;
-      }
-      state.shipX = clamp(state.shipX, SHIP_LIMITS.left - SHIP_CENTER.x, SHIP_LIMITS.right - SHIP_CENTER.x);
-      state.shipY = clamp(state.shipY, SHIP_LIMITS.top - SHIP_CENTER.y, SHIP_LIMITS.bottom - SHIP_CENTER.y);
+      const shipMotion = advanceBodyWithIntent(
+        state,
+        dt,
+        moveX,
+        moveY,
+        SHIP_ACCEL,
+        SHIP_WATER_DRAG,
+        SHIP_MOVE_SPEED,
+        "shipX",
+        "shipY",
+        "shipVx",
+        "shipVy",
+        {
+          minX: SHIP_LIMITS.left - SHIP_CENTER.x,
+          maxX: SHIP_LIMITS.right - SHIP_CENTER.x,
+          minY: SHIP_LIMITS.top - SHIP_CENTER.y,
+          maxY: SHIP_LIMITS.bottom - SHIP_CENTER.y,
+        }
+      );
+      state.roll = approachValue(state.roll || 0, clamp(state.shipVx / SHIP_MOVE_SPEED, -1, 1) * 0.12, dt * 4.6);
+      state.wakePhase += dt * (3 + shipMotion.speed * 0.018);
       const ship = this.shipPosition();
       state.fireCooldown = Math.max(0, state.fireCooldown - dt);
       state.supportFireCooldown = Math.max(0, state.supportFireCooldown - dt);
@@ -1892,6 +2147,7 @@
             danger: 0,
             life: 0,
             dead: false,
+            trail: [],
           });
           state.shots.push({
             fromX: x,
@@ -2049,6 +2305,7 @@
         missile.life += dt;
         missile.speed += 12 * dt;
         missile.size = Math.min(14, missile.size + 1.4 * dt);
+        pushTrailPoint(missile, 18);
         const target = this.pickShipMissileTarget(missile.x, missile.y);
         if (target) {
           missile.targetKind = target.kind;
@@ -2104,6 +2361,7 @@
         missile.life += dt;
         missile.speed += 8 * dt;
         missile.pulse += dt * (5.4 + state.levelIndex * 0.45);
+        pushTrailPoint(missile, 16);
         missile.size = Math.min(missile.maxSize || 16, missile.size + (2 + state.levelIndex * 0.24) * dt);
         missile.displaySize = clamp(
           missile.size + Math.sin(missile.pulse) * 1.05,
@@ -2425,6 +2683,7 @@
         targetX: target.targetX,
         targetY: target.targetY,
         dead: false,
+        trail: [],
       });
       this.ship.supportFireCooldown = SHIP_SUPPORT_MISSILE_FIRE_RATE;
       this.ship.shots.push({
@@ -2484,13 +2743,15 @@
         const length = Math.hypot(dx, dy) || 1;
         const fromX = ship.x + muzzles[i];
         const fromY = ship.y - 36;
+        const inheritedVx = (this.ship.shipVx || 0) * 0.24;
+        const inheritedVy = (this.ship.shipVy || 0) * 0.24;
         this.ship.playerBullets.push({
           x: fromX,
           y: fromY,
           prevX: fromX,
           prevY: fromY,
-          vx: (dx / length) * SHIP_BULLET_SPEED,
-          vy: (dy / length) * SHIP_BULLET_SPEED,
+          vx: (dx / length) * SHIP_BULLET_SPEED + inheritedVx,
+          vy: (dy / length) * SHIP_BULLET_SPEED + inheritedVy,
           life: SHIP_BULLET_LIFE,
         });
         this.ship.shots.push({
@@ -2701,6 +2962,7 @@
       }
 
       for (const missile of state.supportMissiles) {
+        drawMotionTrail(this.dynamic, missile.trail, 0x7ec8ff, 0.18, 2.2, 0xffebaa);
         drawRocketSprite(this.dynamic, missile.x, missile.y, missile.angle, Math.max(8, missile.size || 9), {
           body: 0xdde8ee,
           hot: 0xffd058,
@@ -2717,6 +2979,7 @@
         const hotColor = blendColor(0xff69b4, 0xff3f74, missile.danger || 0);
         const bodyColor = blendColor(0x4b153a, 0xffb0d6, (missile.danger || 0) * 0.74);
         const glowColor = blendColor(0xb33b74, 0xff4f96, missile.danger || 0);
+        drawMotionTrail(this.dynamic, missile.trail, glowColor, 0.16 + (missile.danger || 0) * 0.1, 2.1, hotColor);
         drawRocketSprite(this.dynamic, missile.x, missile.y, missile.angle, missileSize, {
           body: bodyColor,
           hot: hotColor,
@@ -2735,6 +2998,22 @@
       }
 
       const ship = this.shipPosition();
+      const speedRatio = clamp(Math.hypot(state.shipVx, state.shipVy) / SHIP_MOVE_SPEED, 0, 1);
+      const wakeAlpha = 0.12 + speedRatio * 0.2;
+      this.dynamic.fillStyle(0xdff8ff, wakeAlpha * 0.32);
+      this.dynamic.fillEllipse(ship.x - state.shipVx * 0.045, ship.y + 54, 56 + speedRatio * 24, 16 + speedRatio * 6);
+      this.dynamic.lineStyle(2, 0xe3fbff, wakeAlpha);
+      for (let wave = 0; wave < 3; wave += 1) {
+        const waveShift = state.wakePhase * (1.35 + wave * 0.22) + wave * 0.8;
+        const waveY = ship.y + 44 + wave * 12;
+        const spread = 26 + wave * 13 + speedRatio * 18;
+        this.dynamic.beginPath();
+        this.dynamic.moveTo(ship.x - 10, waveY);
+        this.dynamic.lineTo(ship.x - spread, waveY + Math.sin(waveShift) * (4 + speedRatio * 2));
+        this.dynamic.moveTo(ship.x + 10, waveY);
+        this.dynamic.lineTo(ship.x + spread, waveY + Math.cos(waveShift) * (4 + speedRatio * 2));
+        this.dynamic.strokePath();
+      }
       const aimGuide = this.firePad.active ? this.firePad : state.autoTarget;
       if (aimGuide) {
         const length = Math.hypot(aimGuide.x, aimGuide.y) || 1;
@@ -2746,6 +3025,8 @@
         this.dynamic.strokeCircle(state.autoTarget.targetX, state.autoTarget.targetY, state.autoTarget.kind === "launcher" ? 22 : state.autoTarget.kind === "gun" ? 18 : 14);
       }
       this.shipSprite.setPosition(ship.x, ship.y + 6);
+      this.shipSprite.setRotation(state.roll || 0);
+      this.shipSprite.setScale(1 + Math.abs(state.roll || 0) * 0.08, 1);
       this.dynamic.save();
       this.dynamic.translateCanvas(ship.x, ship.y);
       const shieldColors = [0x9bd5ff, 0xffcc4d, 0x5ee3a2];
@@ -2844,6 +3125,10 @@
         armor: 3,
         heliX: 0,
         heliY: 0,
+        heliVx: 0,
+        heliVy: 0,
+        bank: 0,
+        rotor: 0,
         shields: [
           { id: "left", label: "Left", offsetX: -56, alive: true },
           { id: "center", label: "Center", offsetX: 0, alive: true },
@@ -2990,13 +3275,27 @@
       const down = this.cursors.down.isDown || this.keys.S.isDown;
       const moveX = (right ? 1 : 0) - (left ? 1 : 0) + this.movePad.x;
       const moveY = (down ? 1 : 0) - (up ? 1 : 0) + this.movePad.y;
-      if (moveX !== 0 || moveY !== 0) {
-        const length = Math.hypot(moveX, moveY);
-        state.heliX += (moveX / length) * HELI_MOVE_SPEED * dt;
-        state.heliY += (moveY / length) * HELI_MOVE_SPEED * dt;
-      }
-      state.heliX = clamp(state.heliX, HELI_LIMITS.left - HELI_BASE.x, HELI_LIMITS.right - HELI_BASE.x);
-      state.heliY = clamp(state.heliY, HELI_LIMITS.top - HELI_BASE.y, HELI_LIMITS.bottom - HELI_BASE.y);
+      const heliMotion = advanceBodyWithIntent(
+        state,
+        dt,
+        moveX,
+        moveY,
+        HELI_ACCEL,
+        HELI_AIR_DRAG,
+        HELI_MOVE_SPEED,
+        "heliX",
+        "heliY",
+        "heliVx",
+        "heliVy",
+        {
+          minX: HELI_LIMITS.left - HELI_BASE.x,
+          maxX: HELI_LIMITS.right - HELI_BASE.x,
+          minY: HELI_LIMITS.top - HELI_BASE.y,
+          maxY: HELI_LIMITS.bottom - HELI_BASE.y,
+        }
+      );
+      state.bank = approachValue(state.bank || 0, clamp(state.heliVx / HELI_MOVE_SPEED, -1, 1) * 0.18, dt * 4.4);
+      state.rotor += dt * (14 + heliMotion.speed * 0.025);
       state.fireCooldown = Math.max(0, state.fireCooldown - dt);
       if (this.firePad.active && state.fireCooldown <= 0) {
         const heli = this.heliPosition();
@@ -3057,6 +3356,7 @@
               danger: 0,
               life: 0,
               dead: false,
+              trail: [],
             });
             hole.missileCooldown = state.level.missileRate;
           }
@@ -3067,6 +3367,7 @@
         missile.life += dt;
         missile.speed += 7 * dt;
         missile.pulse += dt * (5.8 + state.levelIndex * 0.5);
+        pushTrailPoint(missile, 18);
         missile.size = Math.min(missile.maxSize || 18, missile.size + (2.25 + state.levelIndex * 0.22) * dt);
         missile.displaySize = clamp(
           missile.size + Math.sin(missile.pulse) * 1.15,
@@ -3217,6 +3518,7 @@
         const hotColor = blendColor(0xffc94b, 0xff5a42, missile.danger || 0);
         const bodyColor = blendColor(0xdde8ee, 0xffb16a, (missile.danger || 0) * 0.78);
         const glowColor = blendColor(palette.shock, palette.blast, missile.danger || 0);
+        drawMotionTrail(this.dynamic, missile.trail, glowColor, 0.18 + (missile.danger || 0) * 0.1, 2.2, hotColor);
         drawRocketSprite(this.dynamic, missile.x, missile.y, missile.angle, missileSize, {
           body: bodyColor,
           hot: hotColor,
@@ -3242,29 +3544,49 @@
       }
 
       const heli = this.heliPosition();
+      const heliSpeedRatio = clamp(Math.hypot(state.heliVx, state.heliVy) / HELI_MOVE_SPEED, 0, 1);
       this.dynamic.fillStyle(0x061018, 0.54);
       this.dynamic.fillEllipse(heli.x, heli.y + 8, 156, 58);
+      this.dynamic.fillStyle(0xd9f6ff, 0.08 + heliSpeedRatio * 0.08);
+      this.dynamic.fillEllipse(heli.x - state.heliVx * 0.035, heli.y + 22, 104 + heliSpeedRatio * 34, 18 + heliSpeedRatio * 6);
+      this.dynamic.save();
+      this.dynamic.translateCanvas(heli.x, heli.y);
+      this.dynamic.rotateCanvas(state.bank || 0);
       for (const shield of state.shields) {
-        const shieldX = heli.x + shield.offsetX;
+        const shieldX = shield.offsetX;
         if (shield.alive) {
           this.dynamic.lineStyle(4, shield.id === "center" ? 0x5ee3a2 : 0x9bd5ff, 0.78);
-          this.dynamic.strokeEllipse(shieldX, heli.y, 62, 36);
+          this.dynamic.strokeEllipse(shieldX, 0, 62, 36);
         } else {
           this.dynamic.lineStyle(3, palette.target, 0.58);
-          this.dynamic.strokeEllipse(shieldX, heli.y, 56, 28);
-          this.dynamic.lineBetween(shieldX - 14, heli.y - 12, shieldX + 12, heli.y + 10);
-          this.dynamic.lineBetween(shieldX - 8, heli.y + 12, shieldX + 16, heli.y - 8);
+          this.dynamic.strokeEllipse(shieldX, 0, 56, 28);
+          this.dynamic.lineBetween(shieldX - 14, -12, shieldX + 12, 10);
+          this.dynamic.lineBetween(shieldX - 8, 12, shieldX + 16, -8);
         }
       }
+      const rotorGlow = 0.3 + Math.abs(Math.sin(state.rotor || 0)) * 0.14;
+      this.dynamic.lineStyle(8, 0xcde6ef, rotorGlow * 0.22);
+      this.dynamic.lineBetween(-72, -6, 72, -6);
+      this.dynamic.lineStyle(4, 0xd9e6ec, 0.9);
+      this.dynamic.lineBetween(-58, -2, 58, -2);
+      this.dynamic.lineStyle(2, 0xeff8ff, 0.58);
+      this.dynamic.lineBetween(-34, -12, 34, 8);
       this.dynamic.fillStyle(0xe7eff4, 1);
-      this.dynamic.fillRoundedRect(heli.x - 30, heli.y - 13, 60, 26, 10);
+      this.dynamic.fillRoundedRect(-32, -14, 64, 28, 11);
+      this.dynamic.fillStyle(0x8eb6cf, 0.96);
+      this.dynamic.fillEllipse(10, -2, 22, 16);
       this.dynamic.fillStyle(0x2b4658, 1);
-      this.dynamic.fillRect(heli.x - 7, heli.y - 25, 14, 50);
-      this.dynamic.lineStyle(3, 0xd9e6ec, 0.9);
-      this.dynamic.lineBetween(heli.x - 58, heli.y - 2, heli.x + 58, heli.y - 2);
-      this.dynamic.lineBetween(heli.x, heli.y - 35, heli.x, heli.y + 35);
+      this.dynamic.fillRoundedRect(-10, -26, 20, 52, 6);
+      this.dynamic.fillStyle(0x1c2833, 1);
+      this.dynamic.fillRect(18, -5, 54, 8);
+      this.dynamic.fillRect(-6, 18, 60, 4);
+      this.dynamic.fillStyle(0x7fc6ff, 0.82);
+      this.dynamic.fillRoundedRect(2, -10, 20, 12, 6);
       this.dynamic.fillStyle(palette.target, 0.88);
-      this.dynamic.fillCircle(heli.x, heli.y + 4, 6);
+      this.dynamic.fillCircle(0, 4, 6);
+      this.dynamic.fillStyle(0xf3f7fb, 0.92);
+      this.dynamic.fillCircle(-52, -2, 4);
+      this.dynamic.restore();
 
       for (const particle of state.fx) {
         drawFxParticle(this.fx, particle);
